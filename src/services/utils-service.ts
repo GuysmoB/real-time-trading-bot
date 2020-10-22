@@ -29,17 +29,15 @@ export class UtilsService {
   /**
    * Parse les données depuis IG.
    */
-  async parseData(resolution: string, max: number) {
+  async parseData(ticker: string, resolution: string, max: number) {
     const result = [];
-    //const res = await nodeIg.histPrc('CC.D.LCO.USS.IP', 'HOUR_4', '2012-03-01T00:00:00', '2012-03-01T20:00:00');
-    const res = await ig.get("/prices/CS.D.EURGBP.CFD.IP?resolution=" + resolution + "&max=" + max + "&pageSize=0", 3);
-    console.log(res.body);
-    /* for (let i = 0; i < res.prices.length; i++) {
-      result.push({ open: res.prices[i].openPrice.bid, 
-                        close: res.prices[i].closePrice.bid,
-                        high: res.prices[i].highPrice.bid,
-                        low: res.prices[i].lowPrice.bid});  
-    }   */
+    const res = await ig.get('/prices/CS.D.' +ticker +'.CFD.IP?resolution=' + resolution + '&max=' + max + '&pageSize=0', 3);
+    for (let i = 0; i < res.body.prices.length; i++) {
+      result.push({ open: res.body.prices[i].openPrice.bid, 
+                        close: res.body.prices[i].closePrice.bid,
+                        high: res.body.prices[i].highPrice.bid,
+                        low: res.body.prices[i].lowPrice.bid});  
+    }   
     return result;
   }
 

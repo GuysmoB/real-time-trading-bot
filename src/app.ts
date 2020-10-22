@@ -33,17 +33,16 @@ class App extends CandleAbstract {
     try {
       await ig.login(true);
       //await ig.logout();
-      //data = await this.utils.parseData(ig, 'DAY', 20);
-      //console.log(data)
+      data = await this.utils.parseData('EURUSD', 'DAY', 5);
+      console.log(data)
 
       const items = ["MARKET:CS.D.EURGBP.CFD.IP"];
 
-      ig.connectToLightstreamer();
+     /*  ig.connectToLightstreamer();
       ig.subscribeToLightstreamer("MERGE", items, ["BID"], 0.5);
       ig.lsEmitter.on("update", (streamData: any) => {
         console.log(streamData);
-      });
-      console.error("data", data);
+      }); */
     } catch (error) {
       console.error(error);
     }
