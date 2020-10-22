@@ -20,6 +20,7 @@
   "homepage": "https://github.com/GuysmoB/real-time-trading-bot#readme",
   "dependencies": {
     "ig-api": "^0.15.0",
+    "node-ig-api": "^2.0.4",
     "yarn": "^1.22.10"
   },
   "devDependencies": {
