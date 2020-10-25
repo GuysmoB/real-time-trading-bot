@@ -7,7 +7,7 @@ export class StrategiesService extends CandleAbstract {
     super();
   }
 
-  strategy_LSD_Long(data, i: number): any {
+  strategy_LSD_Long(data: any, i: number): any {
     const lookback = 3;
     const swingHigh1 = this.utils.highest(data, i - 1, "high", lookback);
     const swingHigh2 = this.utils.highest(data, i - 2, "high", lookback);

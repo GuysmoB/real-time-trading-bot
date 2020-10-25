@@ -10,43 +10,143 @@ import { StrategiesService } from "./services/strategies-service";
 import { UtilsService } from "./services/utils-service";
 import ig from "node-ig-api";
 
-// CONNECTION
-const isDemo = false;
-const apiKey = "f20188c382a95fee986b38bc2f40b5c94aebbea9";
-const username = "guysmalerie";
-const password = "lQxTyEbfn73fgbwKMQ1a";
 
 // VARIABLES
-let data = [];
+let allData = [];
 let haData = [];
 let winTrades = [];
 let loseTrades = [];
 let allTrades = [];
+let inLong = false;
+let entryPrice: any;
+let initialStopLoss: any;
+let updatedStopLoss: any;
+
+// CANDLESTICK BUILDER
+const minutesProcessed = [];
+let minutesCandlesticks = [];
+let currentTick: number;
+let previousTick: number;
 
 class App extends CandleAbstract {
   constructor(private utils: UtilsService, private stratService: StrategiesService) {
     super();
-    this.init();
+    this.init(allData);
   }
 
-  async init(): Promise<void> {
+  formatDate(date: Date) {
+    const hours = date.getHours();
+    const minutes = "0" + date.getMinutes();
+    const second = "0" + date.getSeconds();
+    return hours + ':' + minutes.substr(-2)/* + ':' + second.substr(-2)*/; 
+  }
+
+  async init(data: any): Promise<void> {
     try {
       await ig.login(true);
       //await ig.logout();
-      data = await this.utils.parseData('EURUSD', 'DAY', 5);
-      console.log(data)
+      //data = await this.utils.parseData('EURUSD', 'DAY', 5);
+      //console.log(data)
 
-      const items = ["MARKET:CS.D.EURGBP.CFD.IP"];
+      const items = ["CHART:CS.D.BITCOIN.CFD.IP:1MINUTE"];
 
-     /*  ig.connectToLightstreamer();
-      ig.subscribeToLightstreamer("MERGE", items, ["BID"], 0.5);
+      // Received tick [ 1603457557675, 'CS.D.EURGBP.CFD.IP', '0.90538' ]
+      ig.connectToLightstreamer();
+      ig.subscribeToLightstreamer("MERGE", items, ['BID_OPEN', 'BID_HIGH', 'BID_LOW', 'BID_CLOSE', 'CONS_END'], 0.5);
       ig.lsEmitter.on("update", (streamData: any) => {
-        console.log(streamData);
-      }); */
+        const currentCandle = this.utils.candlestickBuilder(streamData);
+        if (currentCandle) {
+          data.push(currentCandle);
+          console.log(currentCandle, data.length)
+        }
+        
+        //this.runStrategy(data);
+
+        
+        /*const time = streamData[0];
+        const ticker = streamData[1];
+        const price = streamData[2];
+        previousTick = currentTick;
+        currentTick = price;
+
+        if (time instanceof Date) { // avoid first line [ 'RUN_TIME', 'EPIC', 'BID' ] CS.D.EURGBP.CFD.IP
+          console.log('Received tick', time, price);
+          let tickDate = this.formatDate(time);
+
+          if (!minutesProcessed.find(element => element === tickDate)) {
+            minutesProcessed.push(tickDate);
+
+            if (minutesCandlesticks.length > 0) {
+              minutesCandlesticks[minutesCandlesticks.length - 1].close = price;
+              console.log('Candlestick', minutesCandlesticks)
+            } 
+
+            minutesCandlesticks.push({
+              date: tickDate,
+              open: price,
+              high: price,
+              low: price,
+            });
+          }
+          
+          if (minutesCandlesticks.length > 0) {
+            let currentCandlestick = minutesCandlesticks[minutesCandlesticks.length - 1];
+            if (price > currentCandlestick.high) {
+              currentCandlestick.high = price; 
+            }
+            if (price < currentCandlestick.low) {
+              currentCandlestick.low = price; 
+            }
+          }
+        }*/
+        
+      });
     } catch (error) {
       console.error(error);
     }
   }
+
+
+  /**
+   * Execution de la stratégie principale.
+   */
+  runStrategy(data: any) {
+    const i = data.length - 1;
+    haData = this.utils.setHeikenAshiData(data); // promise ? A optimiser
+
+    let rr: number;
+    if (inLong) {
+      rr = this.stratService.getHeikenAshi(haData, data, i, entryPrice, initialStopLoss);
+    }
+
+    if (rr !== undefined) {
+      inLong = false;
+      allTrades.push(rr);
+
+      if (rr >= 0) {
+        winTrades.push(rr);
+      } else if (rr < 0) {
+        loseTrades.push(rr);
+      }
+    }
+
+    if (!inLong) {
+      const res = this.stratService.strategy_LSD_Long(data, i);
+      if (res.startTrade) {
+        inLong = true;
+        entryPrice = res.entryPrice;
+        initialStopLoss = updatedStopLoss = res.stopLoss;
+
+        if (this.logEnable) {
+          console.log("--------");
+          console.log("Entry data", data[i]);
+          console.log("entryPrice", entryPrice);
+          console.log("init stopLoss", initialStopLoss);
+        }
+      }
+    }
+  }
+
 
   /**
    * Boucle principale avec itération de chaque bougie.

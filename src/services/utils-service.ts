@@ -133,62 +133,27 @@ export class UtilsService {
       return 0;
     }
   }
+
+
+  candlestickBuilder(streamData: any) {
+    const _open = streamData[2];
+    const _high = streamData[3];
+    const _low = streamData[4];
+    const _close = streamData[5];
+    const endCandle = streamData[6];
+
+    console.log(_open, _high, _low, _close, endCandle)
+    if (endCandle === '1') {
+      return { open: _open, 
+              close: _close,
+              high: _high,
+              low: _low};
+    }
+  }
+
+  
 }
 
 export default new UtilsService();
 
-/*
-minutesProcessed = [];
-minutesCandlesticks = [];
-currentTick = none
-previousTick = none
 
-streamData(data => {
-  previousTick = currentTick;
-  currentTick = data;
-  printf('Received tick', currentTick.time, currentTick.price);
-  tcikDatetimeObject = dateutils.parse(currentTick.time)
-  tick_dt = tickDatetimeObject.strftime('%m/%d/%Y %H:%M')
-  print(tick_dt, tcikDatetimeObject.minute);
-
-  if (not tick_dt in minutesProcessed) {}
-    print('starting new candlestick')
-    minutesProcessed.tick_dt = true
-    print(minutesProcessed).
-
-
-    if len(minuteCandlestick) > 0 {
-      minuteCandlestick[-1].close = previousTick.price
-    }
-
-    minuteCandlesticks.append({
-      minute: tick_dt,
-      open: currentTick.price,
-      high: currentTick.price,
-      low: currentTick.price,
-    })
-  }
-
-  if (len(minuteCandlestick)) > 0 {
-    currentCandlestick = minuteCandletick[-1]
-    if (currentTick.price > currentCandlestick.high) {
-      currentCandlestick.high = currentTick.price; 
-    }
-    if (currentTick.price < currentCandlestick.low) {
-      currentCandlestick.low = currentTick.price; 
-    }
-
-    printf('Candlestick')
-    for (candlestick in minuteCandlestick) {
-      print(candlestick)
-    }
-  }
-
-
-
-
-
-
-})
-
- */
