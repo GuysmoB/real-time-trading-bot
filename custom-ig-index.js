@@ -1088,7 +1088,7 @@ function subscribeToLightstreamer(subscriptionMode, items, fields, maxFreq) {
 
 			onItemUpdate: updateInfo => {
 
-				str.push(new Date().getTime());
+				str.push(new Date());
 
 				str.push(updateInfo.getItemName().split(':')[1]); // epic without 'L1:'
 
@@ -1099,7 +1099,7 @@ function subscribeToLightstreamer(subscriptionMode, items, fields, maxFreq) {
 				});
 
 				//str.push(os.EOL);
-				console.log(str.join(','));
+				//console.log(str.join(','));
 				lsEmitter.emit('update', str);
 				str = [];
 			}
