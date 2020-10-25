@@ -134,24 +134,41 @@ export class UtilsService {
     }
   }
 
-
+  /**
+   * Retourne OHLC du ticker tf correspondant.
+   */
   candlestickBuilder(streamData: any) {
     const _open = streamData[2];
     const _high = streamData[3];
     const _low = streamData[4];
     const _close = streamData[5];
     const endCandle = streamData[6];
-
-    console.log(_open, _high, _low, _close, endCandle)
+    const _tickerTimeframe = this.getTickerTimeframe(streamData[1]);
+    console.log(_tickerTimeframe, _open, _high, _low, _close, endCandle)
     if (endCandle === '1') {
-      return { open: _open, 
-              close: _close,
-              high: _high,
-              low: _low};
+      return { tickerTimeframe: _tickerTimeframe, 
+               open: _open,
+               close: _close,
+               high: _high,
+               low: _low };
     }
   }
 
   
+  dataArrayBuilder(array: any, allData: any) {
+    for (let i = 0; i < array.length; i++) {
+      allData[this.getTickerTimeframe(array[i])] = [];   
+    }
+    return allData; 
+  }
+
+
+  getTickerTimeframe(string: string) {
+    const str = string.split('.');
+    const ticker = str[2];
+    const tf = str[4].split(':');
+    return ticker + '_' + tf[1]; 
+  }
 }
 
 export default new UtilsService();

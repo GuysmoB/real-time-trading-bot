@@ -7,6 +7,23 @@ export class StrategiesService extends CandleAbstract {
     super();
   }
 
+  strategy_test(data: any, i: number): any {
+    return {
+      startTrade: this.close(data, i, 1) > this.open(data, i, 1) && this.close(data, i, 0) > this.open(data, i, 0),
+      stopLoss: this.low(data, i, 1),
+      entryPrice: this.close(data, i, 0)
+    };
+  }
+
+
+  strategy_live_test(data: any, i: number, tick: number): any {
+    return {
+      startTrade: !this.isUp(data, i, 1) && this.low(data, i, 0) < this.low(data, i, 1) && tick > this.high(data, i, 1),
+      stopLoss: this.low(data, i, 0),
+      entryPrice: tick
+    };
+  }
+
   strategy_LSD_Long(data: any, i: number): any {
     const lookback = 3;
     const swingHigh1 = this.utils.highest(data, i - 1, "high", lookback);

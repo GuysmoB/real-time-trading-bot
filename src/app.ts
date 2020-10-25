@@ -22,11 +22,6 @@ let entryPrice: any;
 let initialStopLoss: any;
 let updatedStopLoss: any;
 
-// CANDLESTICK BUILDER
-const minutesProcessed = [];
-let minutesCandlesticks = [];
-let currentTick: number;
-let previousTick: number;
 
 class App extends CandleAbstract {
   constructor(private utils: UtilsService, private stratService: StrategiesService) {
@@ -34,72 +29,47 @@ class App extends CandleAbstract {
     this.init(allData);
   }
 
-  formatDate(date: Date) {
-    const hours = date.getHours();
-    const minutes = "0" + date.getMinutes();
-    const second = "0" + date.getSeconds();
-    return hours + ':' + minutes.substr(-2)/* + ':' + second.substr(-2)*/; 
-  }
-
+  /**
+   * Point d'entrée.
+   */
   async init(data: any): Promise<void> {
     try {
-      await ig.login(true);
+      //await ig.login(true);
       //await ig.logout();
       //data = await this.utils.parseData('EURUSD', 'DAY', 5);
-      //console.log(data)
+      
 
-      const items = ["CHART:CS.D.BITCOIN.CFD.IP:1MINUTE"];
+      const items = ["CHART:CS.D.BITCOIN.CFD.IP:1MINUTE", "CHART:CS.D.EURGBP.CFD.IP:1MINUTE"];
+      //data = this.utils.dataArrayBuilder(items, allData); // vraiment utile ?
+      //console.log(data)
 
       // Received tick [ 1603457557675, 'CS.D.EURGBP.CFD.IP', '0.90538' ]
       ig.connectToLightstreamer();
       ig.subscribeToLightstreamer("MERGE", items, ['BID_OPEN', 'BID_HIGH', 'BID_LOW', 'BID_CLOSE', 'CONS_END'], 0.5);
       ig.lsEmitter.on("update", (streamData: any) => {
+        const liveTick = parseFloat(streamData[5]);
         const currentCandle = this.utils.candlestickBuilder(streamData);
         if (currentCandle) {
-          data.push(currentCandle);
-          console.log(currentCandle, data.length)
+          data[currentCandle.tickerTimeframe].ohlc.push({
+            open: currentCandle.open,
+            close: currentCandle.close,
+            high: currentCandle.high,
+            low: currentCandle.low
+          });
+          console.log(data, currentCandle, data.length)
+          //this.runStrategy(data, liveTick);
+
+          /**
+           * const res = this.runStrategy(data, currentCandle.tickerTimeframe, liveTick);
+
+          if (res) {
+            data.[currentCandle.tickerTimeframe].inLong = true;
+            data.[currentCandle.tickerTimeframe].stoploss = res.stoploss;
+            data.[currentCandle.tickerTimeframe].updateStoploss = res.updateStoploss;
+            data.[currentCandle.tickerTimeframe].takeProfit = res.takeProfit;
+          }
+           */
         }
-        
-        //this.runStrategy(data);
-
-        
-        /*const time = streamData[0];
-        const ticker = streamData[1];
-        const price = streamData[2];
-        previousTick = currentTick;
-        currentTick = price;
-
-        if (time instanceof Date) { // avoid first line [ 'RUN_TIME', 'EPIC', 'BID' ] CS.D.EURGBP.CFD.IP
-          console.log('Received tick', time, price);
-          let tickDate = this.formatDate(time);
-
-          if (!minutesProcessed.find(element => element === tickDate)) {
-            minutesProcessed.push(tickDate);
-
-            if (minutesCandlesticks.length > 0) {
-              minutesCandlesticks[minutesCandlesticks.length - 1].close = price;
-              console.log('Candlestick', minutesCandlesticks)
-            } 
-
-            minutesCandlesticks.push({
-              date: tickDate,
-              open: price,
-              high: price,
-              low: price,
-            });
-          }
-          
-          if (minutesCandlesticks.length > 0) {
-            let currentCandlestick = minutesCandlesticks[minutesCandlesticks.length - 1];
-            if (price > currentCandlestick.high) {
-              currentCandlestick.high = price; 
-            }
-            if (price < currentCandlestick.low) {
-              currentCandlestick.low = price; 
-            }
-          }
-        }*/
-        
       });
     } catch (error) {
       console.error(error);
@@ -110,12 +80,12 @@ class App extends CandleAbstract {
   /**
    * Execution de la stratégie principale.
    */
-  runStrategy(data: any) {
+  runStrategy(data: any, tick: number) {
     const i = data.length - 1;
     haData = this.utils.setHeikenAshiData(data); // promise ? A optimiser
 
     let rr: number;
-    if (inLong) {
+    if (inLong) { // tickertf inLong == true
       rr = this.stratService.getHeikenAshi(haData, data, i, entryPrice, initialStopLoss);
     }
 
@@ -131,7 +101,8 @@ class App extends CandleAbstract {
     }
 
     if (!inLong) {
-      const res = this.stratService.strategy_LSD_Long(data, i);
+      //const res = this.stratService.strategy_LSD_Long(data, i);
+      const res = this.stratService.strategy_test(data, i);
       if (res.startTrade) {
         inLong = true;
         entryPrice = res.entryPrice;

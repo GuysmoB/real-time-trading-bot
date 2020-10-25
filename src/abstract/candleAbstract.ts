@@ -1,6 +1,6 @@
 export abstract class CandleAbstract {
 
-    logEnable = false;
+    logEnable = true;
 
     constructor() { }
 
