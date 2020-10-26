@@ -1,8 +1,6 @@
 // https://www.digitalocean.com/community/tutorials/setting-up-a-node-project-with-typescript
 // https://github.com/nikvdp/pidcrypt/issues/5#issuecomment-511383690
 // https://github.com/Microsoft/TypeScript/issues/17645#issuecomment-320556012
-// https://github.com/wagerfield/ig-api#api-constructor
-// https://www.youtube.com/watch?v=Uv0jcZNYh5Q    candlestick builder
 // https://github.com/gfiocco/node-ig-api#login
 
 import { CandleAbstract } from "./abstract/candleAbstract";
@@ -17,10 +15,10 @@ let haData = [];
 let winTrades = [];
 let loseTrades = [];
 let allTrades = [];
-let inLong = false;
+/* let inLong = false;
 let entryPrice: any;
 let initialStopLoss: any;
-let updatedStopLoss: any;
+let updatedStopLoss: any; */
 
 
 class App extends CandleAbstract {
@@ -34,41 +32,43 @@ class App extends CandleAbstract {
    */
   async init(data: any): Promise<void> {
     try {
-      //await ig.login(true);
+      await ig.login(true);
       //await ig.logout();
       //data = await this.utils.parseData('EURUSD', 'DAY', 5);
-      
 
-      const items = ["CHART:CS.D.BITCOIN.CFD.IP:1MINUTE", "CHART:CS.D.EURGBP.CFD.IP:1MINUTE"];
-      //data = this.utils.dataArrayBuilder(items, allData); // vraiment utile ?
-      //console.log(data)
+      const items = [
+        'CHART:CS.D.EURGBP.CFD.IP:1MINUTE', 'CHART:CS.D.BITCOIN.CFD.IP:1MINUTE', 'CHART:CS.D.EURUSD.CFD.IP:1MINUTE', 'CHART:CS.D.GBPUSD.CFD.IP:1MINUTE',
+        'CHART:CS.D.AUDUSD.CFD.IP:1MINUTE', 'CHART:CS.D.EURJPY.CFD.IP:1MINUTE', 'CHART:CS.D.USDCAD.CFD.IP:1MINUTE', 'CHART:CS.D.USDCHF.CFD.IP:1MINUTE',
+        'CHART:CS.D.EURCHF.CFD.IP:1MINUTE', 'CHART:CS.D.GBPJPY.CFD.IP:1MINUTE', 'CHART:CS.D.EURCAD.CFD.IP:1MINUTE', 'CHART:CS.D.CADJPY.CFD.IP:1MINUTE',
+        'CHART:CS.D.GBPCHF.CFD.IP:1MINUTE', 'CHART:CS.D.CHFJPY.CFD.IP:1MINUTE', 'CHART:CS.D.GBPCAD.CFD.IP:1MINUTE', 'CHART:CS.D.CADCHF.CFD.IP:1MINUTE'];
+      //const items = ['CHART:CS.D.EURGBP.CFD.IP:1MINUTE'];
+      data = this.utils.dataArrayBuilder(items, allData);
 
-      // Received tick [ 1603457557675, 'CS.D.EURGBP.CFD.IP', '0.90538' ]
       ig.connectToLightstreamer();
       ig.subscribeToLightstreamer("MERGE", items, ['BID_OPEN', 'BID_HIGH', 'BID_LOW', 'BID_CLOSE', 'CONS_END'], 0.5);
       ig.lsEmitter.on("update", (streamData: any) => {
-        const liveTick = parseFloat(streamData[5]);
-        const currentCandle = this.utils.candlestickBuilder(streamData);
-        if (currentCandle) {
-          data[currentCandle.tickerTimeframe].ohlc.push({
-            open: currentCandle.open,
-            close: currentCandle.close,
-            high: currentCandle.high,
-            low: currentCandle.low
+        const currentCandle = {
+          open: parseFloat(streamData[2]),
+          high: parseFloat(streamData[3]),
+          low: parseFloat(streamData[4]),
+          close: parseFloat(streamData[5]),
+          ticker: this.utils.getTickerTimeframe(streamData[1])
+        };
+
+        const newCandle = this.utils.candlestickBuilder(streamData);
+        if (newCandle) {
+          data[newCandle.tickerTf].ohlc.push({
+            date: new Date(),
+            ticker: newCandle.tickerTf,
+            open: newCandle.open,
+            high: newCandle.high,
+            low: newCandle.low,
+            close: newCandle.close
           });
-          console.log(data, currentCandle, data.length)
-          //this.runStrategy(data, liveTick);
+        }
 
-          /**
-           * const res = this.runStrategy(data, currentCandle.tickerTimeframe, liveTick);
-
-          if (res) {
-            data.[currentCandle.tickerTimeframe].inLong = true;
-            data.[currentCandle.tickerTimeframe].stoploss = res.stoploss;
-            data.[currentCandle.tickerTimeframe].updateStoploss = res.updateStoploss;
-            data.[currentCandle.tickerTimeframe].takeProfit = res.takeProfit;
-          }
-           */
+        if (data[currentCandle.ticker].ohlc.length > 0) {
+          const res = this.runStrategy(data[currentCandle.ticker], currentCandle);
         }
       });
     } catch (error) {
@@ -80,17 +80,18 @@ class App extends CandleAbstract {
   /**
    * Execution de la stratégie principale.
    */
-  runStrategy(data: any, tick: number) {
+  runStrategy(tickerTf: any, currentCandle: any) {
+    const data = tickerTf.ohlc;
     const i = data.length - 1;
     haData = this.utils.setHeikenAshiData(data); // promise ? A optimiser
 
     let rr: number;
-    if (inLong) { // tickertf inLong == true
-      rr = this.stratService.getHeikenAshi(haData, data, i, entryPrice, initialStopLoss);
+    if (tickerTf.inLong) {
+      rr = this.stratService.getHeikenAshi(haData, data, i, tickerTf.entryPrice, tickerTf.initialStopLoss);
     }
 
     if (rr !== undefined) {
-      inLong = false;
+      tickerTf.inLong = false;
       allTrades.push(rr);
 
       if (rr >= 0) {
@@ -98,21 +99,28 @@ class App extends CandleAbstract {
       } else if (rr < 0) {
         loseTrades.push(rr);
       }
+      console.log("-------------");
+      console.log("Last R:R", rr);
+      console.log("Ticker", currentCandle.ticker);
+      console.log("Trades : Gagnes / Perdus / Total", winTrades.length, loseTrades.length, winTrades.length + loseTrades.length);
+      console.log("Total R:R", this.utils.round(loseTrades.reduce((a, b) => a + b, 0) + winTrades.reduce((a, b) => a + b, 0), 2));
+      console.log("Avg R:R", this.utils.round(allTrades.reduce((a, b) => a + b, 0) / allTrades.length, 2));
+      console.log("Winrate " + this.utils.round((winTrades.length / (loseTrades.length + winTrades.length)) * 100, 2) + "%");
     }
 
-    if (!inLong) {
+    if (!tickerTf.inLong) {
       //const res = this.stratService.strategy_LSD_Long(data, i);
-      const res = this.stratService.strategy_test(data, i);
+      const res = this.stratService.strategy_live_test(data, i, currentCandle);
       if (res.startTrade) {
-        inLong = true;
-        entryPrice = res.entryPrice;
-        initialStopLoss = updatedStopLoss = res.stopLoss;
+        tickerTf.inLong = true;
+        tickerTf.entryPrice = res.entryPrice;
+        tickerTf.initialStopLoss = tickerTf.updatedStopLoss = res.stopLoss;
 
         if (this.logEnable) {
           console.log("--------");
           console.log("Entry data", data[i]);
-          console.log("entryPrice", entryPrice);
-          console.log("init stopLoss", initialStopLoss);
+          console.log("entryPrice", tickerTf.entryPrice);
+          console.log("stopLoss", tickerTf.initialStopLoss);
         }
       }
     }

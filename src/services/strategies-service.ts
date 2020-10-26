@@ -2,27 +2,37 @@ import { CandleAbstract } from "../abstract/candleAbstract";
 import { UtilsService } from "./utils-service";
 
 export class StrategiesService extends CandleAbstract {
-  
+
   constructor(private utils: UtilsService) {
     super();
   }
 
   strategy_test(data: any, i: number): any {
     return {
-      startTrade: this.close(data, i, 1) > this.open(data, i, 1) && this.close(data, i, 0) > this.open(data, i, 0),
+      startTrade: this.isUp(data, i, 1) && this.isUp(data, i, 0),
       stopLoss: this.low(data, i, 1),
       entryPrice: this.close(data, i, 0)
     };
   }
 
 
-  strategy_live_test(data: any, i: number, tick: number): any {
+  strategy_live_test2(data: any, i: number, currentCandle: any): any {
     return {
-      startTrade: !this.isUp(data, i, 1) && this.low(data, i, 0) < this.low(data, i, 1) && tick > this.high(data, i, 1),
+      startTrade: /*!this.isUp(data, i, 0) && */currentCandle.close > this.high(data, i, 0),
       stopLoss: this.low(data, i, 0),
-      entryPrice: tick
+      entryPrice: currentCandle.close
     };
   }
+
+
+  strategy_live_test(data: any, i: number, currentCandle: any): any {
+    return {
+      startTrade: !this.isUp(data, i, 0) && currentCandle.low < this.low(data, i, 0) && currentCandle.close > this.high(data, i, 0),
+      stopLoss: currentCandle.low,
+      entryPrice: currentCandle.close
+    };
+  }
+
 
   strategy_LSD_Long(data: any, i: number): any {
     const lookback = 3;

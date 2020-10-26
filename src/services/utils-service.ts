@@ -3,7 +3,7 @@ import { promisify } from "util";
 import ig from "node-ig-api";
 
 export class UtilsService {
-  constructor() {}
+  constructor() { }
 
   /**
    * Parse et push les donnees CSV.
@@ -31,13 +31,15 @@ export class UtilsService {
    */
   async parseData(ticker: string, resolution: string, max: number) {
     const result = [];
-    const res = await ig.get('/prices/CS.D.' +ticker +'.CFD.IP?resolution=' + resolution + '&max=' + max + '&pageSize=0', 3);
+    const res = await ig.get('/prices/CS.D.' + ticker + '.CFD.IP?resolution=' + resolution + '&max=' + max + '&pageSize=0', 3);
     for (let i = 0; i < res.body.prices.length; i++) {
-      result.push({ open: res.body.prices[i].openPrice.bid, 
-                        close: res.body.prices[i].closePrice.bid,
-                        high: res.body.prices[i].highPrice.bid,
-                        low: res.body.prices[i].lowPrice.bid});  
-    }   
+      result.push({
+        open: res.body.prices[i].openPrice.bid,
+        close: res.body.prices[i].closePrice.bid,
+        high: res.body.prices[i].highPrice.bid,
+        low: res.body.prices[i].lowPrice.bid
+      });
+    }
     return result;
   }
 
@@ -135,7 +137,7 @@ export class UtilsService {
   }
 
   /**
-   * Retourne OHLC du ticker tf correspondant.
+   * Retourne OHLC du ticker correspondant.
    */
   candlestickBuilder(streamData: any) {
     const _open = streamData[2];
@@ -143,23 +145,34 @@ export class UtilsService {
     const _low = streamData[4];
     const _close = streamData[5];
     const endCandle = streamData[6];
-    const _tickerTimeframe = this.getTickerTimeframe(streamData[1]);
-    console.log(_tickerTimeframe, _open, _high, _low, _close, endCandle)
+    const _tickerTf = this.getTickerTimeframe(streamData[1]);
+    //console.log(_tickerTf, _open, _high, _low, _close, endCandle)
+
     if (endCandle === '1') {
-      return { tickerTimeframe: _tickerTimeframe, 
-               open: _open,
-               close: _close,
-               high: _high,
-               low: _low };
+      return {
+        tickerTf: _tickerTf,
+        open: parseFloat(_open),
+        close: parseFloat(_close),
+        high: parseFloat(_high),
+        low: parseFloat(_low)
+      };
     }
+
   }
 
-  
+
   dataArrayBuilder(array: any, allData: any) {
     for (let i = 0; i < array.length; i++) {
-      allData[this.getTickerTimeframe(array[i])] = [];   
+      allData[this.getTickerTimeframe(array[i])] = [];
+      allData[this.getTickerTimeframe(array[i])].ohlc = [];
+      allData[this.getTickerTimeframe(array[i])].inLong = false;
+      allData[this.getTickerTimeframe(array[i])].inShort = false;
+      allData[this.getTickerTimeframe(array[i])].entryPrice = 0;
+      allData[this.getTickerTimeframe(array[i])].initialStopLoss = 0;
+      allData[this.getTickerTimeframe(array[i])].updatedStopLoss = 0;
+      allData[this.getTickerTimeframe(array[i])].takeProfit = 0;
     }
-    return allData; 
+    return allData;
   }
 
 
@@ -167,7 +180,7 @@ export class UtilsService {
     const str = string.split('.');
     const ticker = str[2];
     const tf = str[4].split(':');
-    return ticker + '_' + tf[1]; 
+    return ticker + '_' + tf[1];
   }
 }
 
