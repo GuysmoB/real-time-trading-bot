@@ -16,16 +16,24 @@ export class StrategiesService extends CandleAbstract {
   }
 
 
-  strategy_live_test2(data: any, i: number, currentCandle: any): any {
+  strategy_live_test2_Long(data: any, i: number, currentCandle: any): any {
     return {
-      startTrade: /*!this.isUp(data, i, 0) && */currentCandle.close > this.high(data, i, 0),
+      startTrade: !this.isUp(data, i, 0) && currentCandle.close > this.high(data, i, 0),
       stopLoss: this.low(data, i, 0),
       entryPrice: currentCandle.close
     };
   }
 
 
-  strategy_live_test(data: any, i: number, currentCandle: any): any {
+  strategy_live_test2_Short(data: any, i: number, currentCandle: any): any {
+    return {
+      startTrade: this.isUp(data, i, 0) && currentCandle.close < this.low(data, i, 0),
+      stopLoss: this.high(data, i, 0),
+      entryPrice: currentCandle.close
+    };
+  }
+
+  strategy_live_test_Long(data: any, i: number, currentCandle: any): any {
     return {
       startTrade: !this.isUp(data, i, 0) && currentCandle.low < this.low(data, i, 0) && currentCandle.close > this.high(data, i, 0),
       stopLoss: currentCandle.low,
@@ -33,6 +41,13 @@ export class StrategiesService extends CandleAbstract {
     };
   }
 
+  strategy_live_test_Short(data: any, i: number, currentCandle: any): any {
+    return {
+      startTrade: this.isUp(data, i, 0) && currentCandle.high > this.high(data, i, 0) && currentCandle.close < this.low(data, i, 0),
+      stopLoss: currentCandle.high,
+      entryPrice: currentCandle.close
+    };
+  }
 
   strategy_LSD_Long(data: any, i: number): any {
     const lookback = 3;
@@ -61,15 +76,27 @@ export class StrategiesService extends CandleAbstract {
     };
   }
 
-  getFixedTakeProfitAndStopLoss(data: any, i: number, entryPrice: number, initialStopLoss: number, takeProfit: number): number {
+  getFixedTakeProfitAndStopLoss(direction: string, data: any, i: number, entryPrice: number, initialStopLoss: number, takeProfit: number, currentCandle: any): number {
     let result: number;
 
-    if (this.low(data, i, 0) <= initialStopLoss) {
-      result = -1;
-      this.logEnable ? console.log("SL", data[i]) : NaN;
-    } else if (this.high(data, i, 0) >= takeProfit) {
-      result = this.utils.getRiskReward(entryPrice, initialStopLoss, takeProfit);
-      this.logEnable ? console.log("TP", data[i]) : NaN;
+    if (direction === 'LONG') {
+      if (currentCandle.close <= initialStopLoss) {
+        result = -1;
+        //this.logEnable ? console.log("SL", data[i]) : NaN;
+      } else if (currentCandle.close >= takeProfit) {
+        result = this.utils.getRiskReward(entryPrice, initialStopLoss, takeProfit);
+        //this.logEnable ? console.log("TP", data[i]) : NaN;
+      }
+    } else if (direction === 'SHORT') {
+      if (currentCandle.close >= initialStopLoss) {
+        result = -1;
+        //this.logEnable ? console.log("SL", data[i]) : NaN;
+      } else if (currentCandle.close <= takeProfit) {
+        result = this.utils.getRiskReward(entryPrice, initialStopLoss, takeProfit);
+        //this.logEnable ? console.log("TP", data[i]) : NaN;
+      }
+    } else {
+      console.error('Long or Short ?');
     }
 
     return result;
@@ -123,15 +150,15 @@ export class StrategiesService extends CandleAbstract {
     return result;
   }
 
-  getHeikenAshi(haData: any, data: any, i: number, entryPrice: number, initialStopLoss: number): number {
+  getHeikenAshi(haData: any, data: any, i: number, entryPrice: number, initialStopLoss: number, currentCandle: any): number {
     let result: number;
     const bull1 = haData[i - 1].close > haData[i - 1].open ? true : false;
     const bear = haData[i].close < haData[i].open ? true : false;
 
-    if (this.low(data, i, 0) <= initialStopLoss) {
+    if (currentCandle.low <= initialStopLoss) {
       result = -1;
     } else if (bull1 && bear) {
-      result = this.utils.getRiskReward(entryPrice, initialStopLoss, this.close(data, i, 0));
+      result = this.utils.getRiskReward(entryPrice, initialStopLoss, currentCandle.low);
     }
 
     return result;

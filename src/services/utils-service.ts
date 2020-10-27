@@ -5,6 +5,7 @@ import ig from "node-ig-api";
 export class UtilsService {
   constructor() { }
 
+
   /**
    * Parse et push les donnees CSV.
    */
@@ -26,6 +27,7 @@ export class UtilsService {
     return result;
   }
 
+
   /**
    * Parse les données depuis IG.
    */
@@ -43,12 +45,14 @@ export class UtilsService {
     return result;
   }
 
+
   /**
    * Permet de retourner le R:R
    */
   getRiskReward(entryPrice: number, initialStopLoss: number, closedPrice: number): number {
-    return this.round((closedPrice - entryPrice) / (entryPrice - initialStopLoss), 2);
+    return this.round( Math.abs(closedPrice - entryPrice) / Math.abs(entryPrice - initialStopLoss), 2);
   }
+
 
   /**
    * Retourne la valeur maximale en fonction de la source et de lookback
@@ -68,6 +72,7 @@ export class UtilsService {
     return max;
   }
 
+
   /**
    * Retourne la valeur minimale en fonction de la source et de lookback
    */
@@ -86,6 +91,7 @@ export class UtilsService {
     return min;
   }
 
+
   /**
    * Arrondi un nombre avec une certaine précision.
    */
@@ -93,6 +99,7 @@ export class UtilsService {
     const multiplier = Math.pow(10, precision || 0);
     return Math.round(value * multiplier) / multiplier;
   }
+
 
   /**
    * Retourne l'équivalent HeikenAshi
@@ -122,6 +129,10 @@ export class UtilsService {
     return result;
   }
 
+
+  /**
+   * Retourne une moving average en fonction de la période.
+   */
   sma(data: any, index: number, periode: number): number {
     const result = [];
     const dataStart = index - periode;
@@ -136,46 +147,33 @@ export class UtilsService {
     }
   }
 
+
   /**
-   * Retourne OHLC du ticker correspondant.
+   * Initialise le tableaux de référence.
    */
-  candlestickBuilder(streamData: any) {
-    const _open = streamData[2];
-    const _high = streamData[3];
-    const _low = streamData[4];
-    const _close = streamData[5];
-    const endCandle = streamData[6];
-    const _tickerTf = this.getTickerTimeframe(streamData[1]);
-    //console.log(_tickerTf, _open, _high, _low, _close, endCandle)
-
-    if (endCandle === '1') {
-      return {
-        tickerTf: _tickerTf,
-        open: parseFloat(_open),
-        close: parseFloat(_close),
-        high: parseFloat(_high),
-        low: parseFloat(_low)
-      };
-    }
-
-  }
-
-
   dataArrayBuilder(array: any, allData: any) {
     for (let i = 0; i < array.length; i++) {
-      allData[this.getTickerTimeframe(array[i])] = [];
-      allData[this.getTickerTimeframe(array[i])].ohlc = [];
-      allData[this.getTickerTimeframe(array[i])].inLong = false;
-      allData[this.getTickerTimeframe(array[i])].inShort = false;
-      allData[this.getTickerTimeframe(array[i])].entryPrice = 0;
-      allData[this.getTickerTimeframe(array[i])].initialStopLoss = 0;
-      allData[this.getTickerTimeframe(array[i])].updatedStopLoss = 0;
-      allData[this.getTickerTimeframe(array[i])].takeProfit = 0;
+      const tickerTf = this.getTickerTimeframe(array[i]);
+      allData[tickerTf] = [];
+      allData[tickerTf].ohlc = [];
+      allData[tickerTf].inLong = false;
+      allData[tickerTf].inShort = false;
+      allData[tickerTf].entryPrice_Long = 0;
+      allData[tickerTf].entryPrice_Short = 0;
+      allData[tickerTf].initialStopLoss_Long = 0;
+      allData[tickerTf].initialStopLoss_Short = 0;
+      allData[tickerTf].updatedStopLoss_Long = 0;
+      allData[tickerTf].updatedStopLoss_Short = 0;
+      allData[tickerTf].takeProfit_Long = 0;
+      allData[tickerTf].takeProfit_Short = 0;
     }
     return allData;
   }
 
 
+  /**
+   * Retourne le ticker timeframe.
+   */
   getTickerTimeframe(string: string) {
     const str = string.split('.');
     const ticker = str[2];

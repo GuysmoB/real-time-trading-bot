@@ -8,17 +8,12 @@ import { StrategiesService } from "./services/strategies-service";
 import { UtilsService } from "./services/utils-service";
 import ig from "node-ig-api";
 
-
 // VARIABLES
 let allData = [];
 let haData = [];
 let winTrades = [];
 let loseTrades = [];
 let allTrades = [];
-/* let inLong = false;
-let entryPrice: any;
-let initialStopLoss: any;
-let updatedStopLoss: any; */
 
 
 class App extends CandleAbstract {
@@ -42,7 +37,7 @@ class App extends CandleAbstract {
         'CHART:CS.D.EURCHF.CFD.IP:1MINUTE', 'CHART:CS.D.GBPJPY.CFD.IP:1MINUTE', 'CHART:CS.D.EURCAD.CFD.IP:1MINUTE', 'CHART:CS.D.CADJPY.CFD.IP:1MINUTE',
         'CHART:CS.D.GBPCHF.CFD.IP:1MINUTE', 'CHART:CS.D.CHFJPY.CFD.IP:1MINUTE', 'CHART:CS.D.GBPCAD.CFD.IP:1MINUTE', 'CHART:CS.D.CADCHF.CFD.IP:1MINUTE'];
       //const items = ['CHART:CS.D.EURGBP.CFD.IP:1MINUTE'];
-      data = this.utils.dataArrayBuilder(items, allData);
+      allData = this.utils.dataArrayBuilder(items, allData);
 
       ig.connectToLightstreamer();
       ig.subscribeToLightstreamer("MERGE", items, ['BID_OPEN', 'BID_HIGH', 'BID_LOW', 'BID_CLOSE', 'CONS_END'], 0.5);
@@ -52,23 +47,16 @@ class App extends CandleAbstract {
           high: parseFloat(streamData[3]),
           low: parseFloat(streamData[4]),
           close: parseFloat(streamData[5]),
-          ticker: this.utils.getTickerTimeframe(streamData[1])
+          date: new Date(),
+          tickerTf: this.utils.getTickerTimeframe(streamData[1])
         };
 
-        const newCandle = this.utils.candlestickBuilder(streamData);
-        if (newCandle) {
-          data[newCandle.tickerTf].ohlc.push({
-            date: new Date(),
-            ticker: newCandle.tickerTf,
-            open: newCandle.open,
-            high: newCandle.high,
-            low: newCandle.low,
-            close: newCandle.close
-          });
+        if (streamData[6] === '1') { // CONS_END
+          allData[currentCandle.tickerTf].ohlc.push(currentCandle);
         }
 
-        if (data[currentCandle.ticker].ohlc.length > 0) {
-          const res = this.runStrategy(data[currentCandle.ticker], currentCandle);
+        if (allData[currentCandle.tickerTf].ohlc.length > 0) {
+          const res = this.runStrategy(currentCandle);
         }
       });
     } catch (error) {
@@ -80,47 +68,66 @@ class App extends CandleAbstract {
   /**
    * Execution de la stratégie principale.
    */
-  runStrategy(tickerTf: any, currentCandle: any) {
-    const data = tickerTf.ohlc;
+  runStrategy(currentCandle: any) {
+    // ATTENTION variable locales !!
+    const data = allData[currentCandle.tickerTf].ohlc;
+    const inLong = allData[currentCandle.tickerTf].inLong;
+    const inShort = allData[currentCandle.tickerTf].inShort;
+    const entryPrice_Long = allData[currentCandle.tickerTf].entryPrice_Long;
+    const entryPrice_Short = allData[currentCandle.tickerTf].entryPrice_Short;
+    const initialStopLoss_Long = allData[currentCandle.tickerTf].initialStopLoss_Long;
+    const initialStopLoss_Short = allData[currentCandle.tickerTf].initialStopLoss_Short;
+    const takeProfit_Long = allData[currentCandle.tickerTf].takeProfit_Long;
+    const takeProfit_Short = allData[currentCandle.tickerTf].takeProfit_Short;
     const i = data.length - 1;
     haData = this.utils.setHeikenAshiData(data); // promise ? A optimiser
 
     let rr: number;
-    if (tickerTf.inLong) {
-      rr = this.stratService.getHeikenAshi(haData, data, i, tickerTf.entryPrice, tickerTf.initialStopLoss);
+    if (inLong) {
+      //rr = this.stratService.getHeikenAshi(haData, data, i, tickerTf.entryPrice_Long, tickerTf.initialStopLoss_Long, currentCandle);
+      rr = this.stratService.getFixedTakeProfitAndStopLoss('LONG', data, i, entryPrice_Long, initialStopLoss_Long, takeProfit_Long, currentCandle);
+      this.updateResults('LONG', rr, currentCandle);
+    }
+    if (inShort) {
+      rr = this.stratService.getFixedTakeProfitAndStopLoss('SHORT', data, i, entryPrice_Short, initialStopLoss_Short, takeProfit_Short, currentCandle);
+      this.updateResults('SHORT', rr, currentCandle);
     }
 
-    if (rr !== undefined) {
-      tickerTf.inLong = false;
-      allTrades.push(rr);
+    
 
-      if (rr >= 0) {
-        winTrades.push(rr);
-      } else if (rr < 0) {
-        loseTrades.push(rr);
-      }
-      console.log("-------------");
-      console.log("Last R:R", rr);
-      console.log("Ticker", currentCandle.ticker);
-      console.log("Trades : Gagnes / Perdus / Total", winTrades.length, loseTrades.length, winTrades.length + loseTrades.length);
-      console.log("Total R:R", this.utils.round(loseTrades.reduce((a, b) => a + b, 0) + winTrades.reduce((a, b) => a + b, 0), 2));
-      console.log("Avg R:R", this.utils.round(allTrades.reduce((a, b) => a + b, 0) / allTrades.length, 2));
-      console.log("Winrate " + this.utils.round((winTrades.length / (loseTrades.length + winTrades.length)) * 100, 2) + "%");
-    }
-
-    if (!tickerTf.inLong) {
+    if (!inLong) {
       //const res = this.stratService.strategy_LSD_Long(data, i);
-      const res = this.stratService.strategy_live_test(data, i, currentCandle);
+      const res = this.stratService.strategy_live_test_Long(data, i, currentCandle);
       if (res.startTrade) {
-        tickerTf.inLong = true;
-        tickerTf.entryPrice = res.entryPrice;
-        tickerTf.initialStopLoss = tickerTf.updatedStopLoss = res.stopLoss;
+        allData[currentCandle.tickerTf].inLong = true;
+        allData[currentCandle.tickerTf].entryPrice_Long = res.entryPrice;
+        allData[currentCandle.tickerTf].initialStopLoss_Long = allData[currentCandle.tickerTf].updatedStopLoss_Long = res.stopLoss;
+        allData[currentCandle.tickerTf].takeProfit_Long = this.utils.round(res.entryPrice + (res.entryPrice - res.stopLoss) * 2, 5);
 
         if (this.logEnable) {
           console.log("--------");
-          console.log("Entry data", data[i]);
-          console.log("entryPrice", tickerTf.entryPrice);
-          console.log("stopLoss", tickerTf.initialStopLoss);
+          console.log("Long", data[i].tickerTf, data[i].date);
+          console.log("entryPrice", allData[currentCandle.tickerTf].entryPrice_Long);
+          console.log("stopLoss", allData[currentCandle.tickerTf].initialStopLoss_Long);
+          console.log("takeProfit", allData[currentCandle.tickerTf].takeProfit_Long);
+        }
+      }
+    } 
+    
+    if (!inShort) {
+      const res = this.stratService.strategy_live_test_Short(data, i, currentCandle);
+      if (res.startTrade) {
+        allData[currentCandle.tickerTf].inShort = true;
+        allData[currentCandle.tickerTf].entryPrice_Short = res.entryPrice;
+        allData[currentCandle.tickerTf].initialStopLoss_Short = allData[currentCandle.tickerTf].updatedStopLoss_Short = res.stopLoss;
+        allData[currentCandle.tickerTf].takeProfit_Short = this.utils.round(res.entryPrice + (res.entryPrice - res.stopLoss) * 2, 5);
+
+        if (this.logEnable) {
+          console.log("--------");
+          console.log("Short", data[i].tickerTf, data[i].date);
+          console.log("entryPrice", allData[currentCandle.tickerTf].entryPrice_Short);
+          console.log("stopLoss", allData[currentCandle.tickerTf].initialStopLoss_Short);
+          console.log("takeProfit", allData[currentCandle.tickerTf].takeProfit_Short);
         }
       }
     }
@@ -154,7 +161,7 @@ class App extends CandleAbstract {
       let rr: number;
       if (inLong) {
         if (isFixedTakeProfitAndStopLoss) {
-          rr = this.stratService.getFixedTakeProfitAndStopLoss(data, i, entryPrice, initialStopLoss, takeProfit);
+          //rr = this.stratService.getFixedTakeProfitAndStopLoss(data, i, entryPrice, initialStopLoss, takeProfit);
         } else if (isFixedTakeProfitAndBreakEvenStopLoss) {
           rr = this.stratService.getFixedTakeProfitpAndBreakEvenStopLoss(data, i, entryPrice, initialStopLoss, updatedStopLoss, takeProfit, arg);
         } else if (isTrailingStopLoss) {
@@ -164,7 +171,7 @@ class App extends CandleAbstract {
           updatedStopLoss = this.stratService.updateStopLoss(data, i, entryPrice, initialStopLoss, updatedStopLoss, 0.7);
           rr = this.stratService.getFixeTakeProfitAndTrailingStopLoss(data, i, entryPrice, initialStopLoss, updatedStopLoss, takeProfit);
         } else if (isHeikenAshi) {
-          rr = this.stratService.getHeikenAshi(haData, data, i, entryPrice, initialStopLoss);
+          //rr = this.stratService.getHeikenAshi(haData, data, i, entryPrice, initialStopLoss, );
         }
       }
 
@@ -205,6 +212,36 @@ class App extends CandleAbstract {
     console.log("Total R:R", this.utils.round(loseTrades.reduce((a, b) => a + b, 0) + winTrades.reduce((a, b) => a + b, 0), 2));
     console.log("Avg R:R", this.utils.round(allTrades.reduce((a, b) => a + b, 0) / allTrades.length, 2));
     console.log("Winrate " + this.utils.round((winTrades.length / (loseTrades.length + winTrades.length)) * 100, 2) + "%");
+  }
+
+
+  /**
+   * Update trades's state, global R:R and log.
+   */
+  updateResults(direction: string, rr: number, currentCandle: any) {
+    if (rr !== undefined) {
+      if (direction === 'LONG') {
+        allData[currentCandle.tickerTf].inLong = false;
+      } else if (direction === 'SHORT') {
+        allData[currentCandle.tickerTf].inShort = false;
+      } else {
+        console.error('Long or short ?')
+      }
+
+      allTrades.push(rr);
+      if (rr >= 0) {
+        winTrades.push(rr);
+      } else if (rr < 0) {
+        loseTrades.push(rr);
+      }
+      console.log("---- UPDATED RESULTS ----");
+      console.log("Last R:R", rr);
+      console.log(direction, currentCandle.tickerTf);
+      console.log("Trades : Gagnes / Perdus / Total", winTrades.length, loseTrades.length, winTrades.length + loseTrades.length);
+      console.log("Total R:R", this.utils.round(loseTrades.reduce((a, b) => a + b, 0) + winTrades.reduce((a, b) => a + b, 0), 2));
+      console.log("Avg R:R", this.utils.round(allTrades.reduce((a, b) => a + b, 0) / allTrades.length, 2));
+      console.log("Winrate " + this.utils.round((winTrades.length / (loseTrades.length + winTrades.length)) * 100, 2) + "%");
+    }
   }
 }
 
