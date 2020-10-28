@@ -1,5 +1,4 @@
-runtime: nodejs
-env: flex
+runtime: nodejs10
 env_variables:
   IG_IDENTIFIER: guysmalerie_demo
   IG_PASSWORD: Guysmo92*
