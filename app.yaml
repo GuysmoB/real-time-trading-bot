@@ -1,2 +1,7 @@
 runtime: nodejs
 env: flex
+env_variables:
+  IG_IDENTIFIER: guysmalerie_demo
+  IG_PASSWORD: Guysmo92*
+  IG_DEMO: TRUE
+  IG_API_KEY: 7371473764e015d5c0af7a19451bf58a96eba73e
