@@ -50,7 +50,7 @@ export class UtilsService {
    * Permet de retourner le R:R
    */
   getRiskReward(entryPrice: number, initialStopLoss: number, closedPrice: number): number {
-    return this.round( Math.abs(closedPrice - entryPrice) / Math.abs(entryPrice - initialStopLoss), 2);
+    return this.round(Math.abs(closedPrice - entryPrice) / Math.abs(entryPrice - initialStopLoss), 2);
   }
 
 
@@ -109,11 +109,15 @@ export class UtilsService {
 
     for (let j = 0; j < source.length; j++) {
       if (j === 0) {
+        const _close = this.round((source[j].open + source[j].high + source[j].low + source[j].close) / 4, 5);
+        const _open = this.round((source[j].open + source[j].close) / 2, 5);
         result.push({
-          close: this.round((source[j].open + source[j].high + source[j].low + source[j].close) / 4, 5),
-          open: this.round((source[j].open + source[j].close) / 2, 5),
+          close: _close,
+          open: _open,
           low: source[j].low,
           high: source[j].high,
+          bull: _close > _open,
+          bear: _close < _open,
         });
       } else {
         const haCloseVar = (source[j].open + source[j].high + source[j].low + source[j].close) / 4;
@@ -123,6 +127,8 @@ export class UtilsService {
           open: this.round(haOpenVar, 5),
           low: this.round(Math.min(source[j].low, Math.max(haOpenVar, haCloseVar)), 5),
           high: this.round(Math.max(source[j].high, Math.max(haOpenVar, haCloseVar)), 5),
+          bull: haCloseVar > haOpenVar,
+          bear: haCloseVar < haOpenVar,
         });
       }
     }
@@ -156,6 +162,8 @@ export class UtilsService {
       const tickerTf = this.getTickerTimeframe(array[i]);
       allData[tickerTf] = [];
       allData[tickerTf].ohlc = [];
+      allData[tickerTf].trigger_Long = [];
+      allData[tickerTf].trigger_Short = [];
       allData[tickerTf].inLong = false;
       allData[tickerTf].inShort = false;
       allData[tickerTf].entryPrice_Long = 0;
@@ -179,6 +187,24 @@ export class UtilsService {
     const ticker = str[2];
     const tf = str[4].split(':');
     return ticker + '_' + tf[1];
+  }
+
+
+  /**
+   * Permet d'arrêter le processus.
+   */
+  stopProcess() {
+    console.log('Process is about to stop');
+    process.exit();
+  }
+
+
+  getLastElement(array: any) {
+    return array[array.length - 1];
+  }
+
+  setLastElement(array): any {
+
   }
 }
 

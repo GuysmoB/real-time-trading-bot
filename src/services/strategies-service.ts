@@ -80,20 +80,16 @@ export class StrategiesService extends CandleAbstract {
     let result: number;
 
     if (direction === 'LONG') {
-      if (currentCandle.close <= initialStopLoss) {
-        result = -1;
-        //this.logEnable ? console.log("SL", data[i]) : NaN;
-      } else if (currentCandle.close >= takeProfit) {
+      if (currentCandle.close >= takeProfit) {
         result = this.utils.getRiskReward(entryPrice, initialStopLoss, takeProfit);
-        //this.logEnable ? console.log("TP", data[i]) : NaN;
+      } else if (currentCandle.close <= initialStopLoss) {
+        result = -1;
       }
     } else if (direction === 'SHORT') {
-      if (currentCandle.close >= initialStopLoss) {
-        result = -1;
-        //this.logEnable ? console.log("SL", data[i]) : NaN;
-      } else if (currentCandle.close <= takeProfit) {
+      if (currentCandle.close <= takeProfit) {
         result = this.utils.getRiskReward(entryPrice, initialStopLoss, takeProfit);
-        //this.logEnable ? console.log("TP", data[i]) : NaN;
+      } else if (currentCandle.close >= initialStopLoss) {
+        result = -1;
       }
     } else {
       console.error('Long or Short ?');
@@ -105,7 +101,7 @@ export class StrategiesService extends CandleAbstract {
   getFixedTakeProfitpAndBreakEvenStopLoss(data: any, i: number, entryPrice: number, initialStopLoss: number, updatedStopLoss: number, takeProfit: number, targetRR: number): number {
     let result: number;
     const minTarget = 2;
-    const step1 = entryPrice + (entryPrice - initialStopLoss) * minTarget;
+    const step1 = entryPrice + (Math.abs(entryPrice - initialStopLoss)) * minTarget;
 
     if (updatedStopLoss < entryPrice && this.high(data, i, 0) >= step1 && targetRR > minTarget) {
       updatedStopLoss = entryPrice;
@@ -150,15 +146,32 @@ export class StrategiesService extends CandleAbstract {
     return result;
   }
 
-  getHeikenAshi(haData: any, data: any, i: number, entryPrice: number, initialStopLoss: number, currentCandle: any): number {
+  getHeikenAshi_Long(haData: any, data: any, i: number, entryPrice: number, initialStopLoss: number, currentCandle: any): number {
     let result: number;
-    const bull1 = haData[i - 1].close > haData[i - 1].open ? true : false;
+    const step1 = entryPrice + (Math.abs(entryPrice - initialStopLoss)) * 2;
+    const bull1 = haData[i - 1].close > haData[i - 1].open ? true : false; // A CHANGER
     const bear = haData[i].close < haData[i].open ? true : false;
 
-    if (currentCandle.low <= initialStopLoss) {
+    if (currentCandle.close <= initialStopLoss) {
       result = -1;
-    } else if (bull1 && bear) {
-      result = this.utils.getRiskReward(entryPrice, initialStopLoss, currentCandle.low);
+    } else if (currentCandle.close >= step1 && bull1 && bear) {
+      result = this.utils.getRiskReward(entryPrice, initialStopLoss, currentCandle.close);
+    }
+
+    return result;
+  }
+
+
+  getHeikenAshi_Short(haData: any, data: any, i: number, entryPrice: number, initialStopLoss: number, currentCandle: any): number {
+    let result: number;
+    const step1 = entryPrice - (Math.abs(entryPrice - initialStopLoss)) * 2;
+    const bear1 = haData[i - 1].close < haData[i - 1].open ? true : false;
+    const bull = haData[i].close > haData[i].open ? true : false;
+
+    if (currentCandle.close >= initialStopLoss) {
+      result = -1;
+    } else if (currentCandle.close <= step1 && bear1 && bull) {
+      result = this.utils.getRiskReward(entryPrice, initialStopLoss, currentCandle.close);
     }
 
     return result;
@@ -169,8 +182,8 @@ export class StrategiesService extends CandleAbstract {
       console.error("trailingNumber too big");
     }
 
-    const step1 = entryPrice + (entryPrice - initialStopLoss) * 2;
-    const step2 = entryPrice + (entryPrice - initialStopLoss) * 3;
+    const step1 = entryPrice + (Math.abs(entryPrice - initialStopLoss)) * 2;
+    const step2 = entryPrice + (Math.abs(entryPrice - initialStopLoss)) * 3;
 
     if (this.high(data, i, 0) >= step1 && updatedStopLoss < entryPrice) {
       updatedStopLoss = entryPrice;
@@ -183,6 +196,78 @@ export class StrategiesService extends CandleAbstract {
     }
 
     return updatedStopLoss;
+  }
+
+
+  strategy_EngulfingRetested_Long(data: any, i: number, trigger: any, currentCandle: any): any {
+    let sl: number;
+    let entryPrice: number;
+    let startTrade = false;
+    const maxTimeSpent = 20;
+    const lastTrigger = trigger[trigger.length - 1]; // VARIABLE LOCALE
+    const candle0Size = Math.abs(this.close(data, i, 0) - this.open(data, i, 0));
+    const candle1Size = Math.abs(this.close(data, i, 1) - this.open(data, i, 1));
+    const liquidity = this.low(data, i, 0) < this.low(data, i, 1);
+    const breakout = this.close(data, i, 0) > this.high(data, i, 1);
+    const setup1 = !this.isUp(data, i, 1) && this.isUp(data, i, 0) && (candle0Size >= candle1Size * 2) /* && liquidity*/ && breakout;
+
+    if (lastTrigger && !lastTrigger.canceled && !lastTrigger.retested) {
+      const timeSpent = i - lastTrigger.time;
+      if (timeSpent <= maxTimeSpent && currentCandle.close <= lastTrigger.candle1.open) {
+        startTrade = true;
+        sl = lastTrigger.candle1.low;
+        entryPrice = lastTrigger.candle1.open;
+        trigger[trigger.length - 1].retested = true;
+      } else if (timeSpent > maxTimeSpent) {
+        trigger[trigger.length - 1].canceled = true;
+      }
+    } else if (setup1) {
+      console.log('Bull engulfing', currentCandle.date, currentCandle.tickerTf);
+      trigger.push({ time: i, retested: false, canceled: false, candle1: data[i - 1], candle0: data[i] });
+    }
+
+    return {
+      startTrade: startTrade,
+      stopLoss: sl,
+      entryPrice: entryPrice,
+      trigger: trigger
+    };
+  }
+
+
+  strategy_EngulfingRetested_Short(data: any, i: number, trigger: any, currentCandle: any): any {
+    let sl: number;
+    let entryPrice: number;
+    let startTrade = false;
+    const maxTimeSpent = 20;
+    const lastTrigger = trigger[trigger.length - 1];
+    const candle0Size = Math.abs(this.close(data, i, 0) - this.open(data, i, 0));
+    const candle1Size = Math.abs(this.close(data, i, 1) - this.open(data, i, 1));
+    const liquidity = this.high(data, i, 0) > this.high(data, i, 1);
+    const breakout = this.close(data, i, 0) < this.low(data, i, 1);
+    const setup1 = this.isUp(data, i, 1) && !this.isUp(data, i, 0) && (candle0Size >= candle1Size * 2) /*&& liquidity*/ && breakout;
+
+    if (lastTrigger && !lastTrigger.canceled && !lastTrigger.retested) {
+      const timeSpent = i - lastTrigger.time;
+      if (timeSpent <= maxTimeSpent && currentCandle.close >= lastTrigger.candle1.open) {
+        startTrade = true;
+        sl = lastTrigger.candle1.high;
+        entryPrice = lastTrigger.candle1.open;
+        trigger[trigger.length - 1].retested = true;
+      } else if (timeSpent > maxTimeSpent) {
+        trigger[trigger.length - 1].canceled = true;
+      }
+    } else if (setup1) {
+      console.log('Short engulfing', currentCandle.date, currentCandle.tickerTf);
+      trigger.push({ time: i, retested: false, canceled: false, candle1: data[i - 1], candle0: data[i] });
+    }
+
+    return {
+      startTrade: startTrade,
+      stopLoss: sl,
+      entryPrice: entryPrice,
+      trigger: trigger
+    };
   }
 }
 
