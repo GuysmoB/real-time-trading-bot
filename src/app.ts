@@ -16,29 +16,30 @@ let loseTrades = [];
 let allTrades = [];
 let haData = [];
 
+const items = [
+  'CHART:CS.D.EURGBP.CFD.IP:1MINUTE', 'CHART:CS.D.BITCOIN.CFD.IP:1MINUTE', 'CHART:CS.D.EURUSD.CFD.IP:1MINUTE', 'CHART:CS.D.GBPUSD.CFD.IP:1MINUTE',
+  'CHART:CS.D.AUDUSD.CFD.IP:1MINUTE', 'CHART:CS.D.EURJPY.CFD.IP:1MINUTE', 'CHART:CS.D.USDCAD.CFD.IP:1MINUTE', 'CHART:CS.D.USDCHF.CFD.IP:1MINUTE',
+  'CHART:CS.D.EURCHF.CFD.IP:1MINUTE', 'CHART:CS.D.GBPJPY.CFD.IP:1MINUTE', 'CHART:CS.D.EURCAD.CFD.IP:1MINUTE', 'CHART:CS.D.CADJPY.CFD.IP:1MINUTE',
+  'CHART:CS.D.GBPCHF.CFD.IP:1MINUTE', 'CHART:CS.D.CHFJPY.CFD.IP:1MINUTE', 'CHART:CS.D.GBPCAD.CFD.IP:1MINUTE', 'CHART:CS.D.CADCHF.CFD.IP:1MINUTE',
+  'CHART:CS.D.EURAUD.CFD.IP:1MINUTE', 'CHART:CS.D.AUDJPY.CFD.IP:1MINUTE', 'CHART:CS.D.AUDCAD.CFD.IP:1MINUTE', 'CHART:CS.D.AUDCHF.CFD.IP:1MINUTE',
+  'CHART:CS.D.NZDUSD.CFD.IP:1MINUTE', 'CHART:CS.D.GBPNZD.CFD.IP:1MINUTE', 'CHART:CS.D.GBPAUD.CFD.IP:1MINUTE', 'CHART:CS.D.AUDNZD.CFD.IP:1MINUTE'];
+//const items = ['CHART:CS.D.EURGBP.CFD.IP:1MINUTE'];
+
 class App extends CandleAbstract {
   constructor(private utils: UtilsService, private stratService: StrategiesService) {
     super();
-    this.init(allData);
+    allData = this.utils.dataArrayBuilder(items, allData);
+    this.init();
   }
+
 
   /**
    * Point d'entrée.
    */
-  async init(data: any): Promise<void> {
+  async init(): Promise<void> {
     try {
       await ig.login(true);
       //await ig.logout();
-
-      const items = [
-        'CHART:CS.D.EURGBP.CFD.IP:5MINUTE', 'CHART:CS.D.BITCOIN.CFD.IP:5MINUTE', 'CHART:CS.D.EURUSD.CFD.IP:5MINUTE', 'CHART:CS.D.GBPUSD.CFD.IP:5MINUTE',
-        'CHART:CS.D.AUDUSD.CFD.IP:5MINUTE', 'CHART:CS.D.EURJPY.CFD.IP:5MINUTE', 'CHART:CS.D.USDCAD.CFD.IP:5MINUTE', 'CHART:CS.D.USDCHF.CFD.IP:5MINUTE',
-        'CHART:CS.D.EURCHF.CFD.IP:5MINUTE', 'CHART:CS.D.GBPJPY.CFD.IP:5MINUTE', 'CHART:CS.D.EURCAD.CFD.IP:5MINUTE', 'CHART:CS.D.CADJPY.CFD.IP:5MINUTE',
-        'CHART:CS.D.GBPCHF.CFD.IP:5MINUTE', 'CHART:CS.D.CHFJPY.CFD.IP:5MINUTE', 'CHART:CS.D.GBPCAD.CFD.IP:5MINUTE', 'CHART:CS.D.CADCHF.CFD.IP:5MINUTE',
-        'CHART:CS.D.EURAUD.CFD.IP:5MINUTE', 'CHART:CS.D.AUDJPY.CFD.IP:5MINUTE', 'CHART:CS.D.AUDCAD.CFD.IP:5MINUTE', 'CHART:CS.D.AUDCHF.CFD.IP:5MINUTE',
-        'CHART:CS.D.NZDUSD.CFD.IP:5MINUTE', 'CHART:CS.D.GBPNZD.CFD.IP:5MINUTE', 'CHART:CS.D.GBPAUD.CFD.IP:5MINUTE', 'CHART:CS.D.AUDNZD.CFD.IP:5MINUTE'];
-      //const items = ['CHART:CS.D.EURGBP.CFD.IP:5MINUTE'];
-      allData = this.utils.dataArrayBuilder(items, allData);
 
       ig.connectToLightstreamer();
       ig.subscribeToLightstreamer('MERGE', items, ['BID_OPEN', 'BID_HIGH', 'BID_LOW', 'BID_CLOSE', 'CONS_END', 'OFR_OPEN', 'OFR_HIGH', 'OFR_LOW', 'OFR_CLOSE',], 2);
@@ -82,8 +83,6 @@ class App extends CandleAbstract {
     const initialStopLoss_Short = allData[currentCandle.tickerTf].initialStopLoss_Short;
     const takeProfit_Long = allData[currentCandle.tickerTf].takeProfit_Long;
     const takeProfit_Short = allData[currentCandle.tickerTf].takeProfit_Short;
-    const lastTrigger_Long = allData[currentCandle.tickerTf].trigger_Long.length - 1;
-    const lastTrigger_Short = allData[currentCandle.tickerTf].trigger_Short.length - 1;
     const trigger_Long = allData[currentCandle.tickerTf].trigger_Long;
     const trigger_Short = allData[currentCandle.tickerTf].trigger_Short;
 
