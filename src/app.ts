@@ -17,13 +17,13 @@ let allTrades = [];
 let haData = [];
 
 const items = [
-  'CHART:CS.D.EURGBP.CFD.IP:1MINUTE', 'CHART:CS.D.BITCOIN.CFD.IP:1MINUTE', 'CHART:CS.D.EURUSD.CFD.IP:1MINUTE', 'CHART:CS.D.GBPUSD.CFD.IP:1MINUTE',
-  'CHART:CS.D.AUDUSD.CFD.IP:1MINUTE', 'CHART:CS.D.EURJPY.CFD.IP:1MINUTE', 'CHART:CS.D.USDCAD.CFD.IP:1MINUTE', 'CHART:CS.D.USDCHF.CFD.IP:1MINUTE',
-  'CHART:CS.D.EURCHF.CFD.IP:1MINUTE', 'CHART:CS.D.GBPJPY.CFD.IP:1MINUTE', 'CHART:CS.D.EURCAD.CFD.IP:1MINUTE', 'CHART:CS.D.CADJPY.CFD.IP:1MINUTE',
-  'CHART:CS.D.GBPCHF.CFD.IP:1MINUTE', 'CHART:CS.D.CHFJPY.CFD.IP:1MINUTE', 'CHART:CS.D.GBPCAD.CFD.IP:1MINUTE', 'CHART:CS.D.CADCHF.CFD.IP:1MINUTE',
-  'CHART:CS.D.EURAUD.CFD.IP:1MINUTE', 'CHART:CS.D.AUDJPY.CFD.IP:1MINUTE', 'CHART:CS.D.AUDCAD.CFD.IP:1MINUTE', 'CHART:CS.D.AUDCHF.CFD.IP:1MINUTE',
-  'CHART:CS.D.NZDUSD.CFD.IP:1MINUTE', 'CHART:CS.D.GBPNZD.CFD.IP:1MINUTE', 'CHART:CS.D.GBPAUD.CFD.IP:1MINUTE', 'CHART:CS.D.AUDNZD.CFD.IP:1MINUTE'];
-//const items = ['CHART:CS.D.EURGBP.CFD.IP:1MINUTE'];
+  'CHART:CS.D.EURGBP.CFD.IP:5MINUTE', 'CHART:CS.D.BITCOIN.CFD.IP:5MINUTE', 'CHART:CS.D.EURUSD.CFD.IP:5MINUTE', 'CHART:CS.D.GBPUSD.CFD.IP:5MINUTE',
+  'CHART:CS.D.AUDUSD.CFD.IP:5MINUTE', 'CHART:CS.D.EURJPY.CFD.IP:5MINUTE', 'CHART:CS.D.USDCAD.CFD.IP:5MINUTE', 'CHART:CS.D.USDCHF.CFD.IP:5MINUTE',
+  'CHART:CS.D.EURCHF.CFD.IP:5MINUTE', 'CHART:CS.D.GBPJPY.CFD.IP:5MINUTE', 'CHART:CS.D.EURCAD.CFD.IP:5MINUTE', 'CHART:CS.D.CADJPY.CFD.IP:5MINUTE',
+  'CHART:CS.D.GBPCHF.CFD.IP:5MINUTE', 'CHART:CS.D.CHFJPY.CFD.IP:5MINUTE', 'CHART:CS.D.GBPCAD.CFD.IP:5MINUTE', 'CHART:CS.D.CADCHF.CFD.IP:5MINUTE',
+  'CHART:CS.D.EURAUD.CFD.IP:5MINUTE', 'CHART:CS.D.AUDJPY.CFD.IP:5MINUTE', 'CHART:CS.D.AUDCAD.CFD.IP:5MINUTE', 'CHART:CS.D.AUDCHF.CFD.IP:5MINUTE',
+  'CHART:CS.D.NZDUSD.CFD.IP:5MINUTE', 'CHART:CS.D.GBPNZD.CFD.IP:5MINUTE', 'CHART:CS.D.GBPAUD.CFD.IP:5MINUTE', 'CHART:CS.D.AUDNZD.CFD.IP:5MINUTE'];
+//const items = ['CHART:CS.D.EURGBP.CFD.IP:5MINUTE'];
 
 class App extends CandleAbstract {
   constructor(private utils: UtilsService, private stratService: StrategiesService) {
@@ -73,6 +73,7 @@ class App extends CandleAbstract {
   runStrategy(currentCandle: any) {
     // ATTENTION variable locales !!
     let rr: number;
+    const rrTarget = 2;
     const data = allData[currentCandle.tickerTf].ohlc;
     const i = allData[currentCandle.tickerTf].ohlc.length - 1;
     const inLong = allData[currentCandle.tickerTf].inLong;
@@ -90,19 +91,25 @@ class App extends CandleAbstract {
       rr = this.stratService.getFixedTakeProfitAndStopLoss('LONG', data, i, entryPrice_Long, initialStopLoss_Long, takeProfit_Long, currentCandle);
       this.updateResults('LONG', rr, currentCandle);
     } else {
-      const res = this.stratService.strategy_EngulfingRetested_Long(data, i, trigger_Long, currentCandle);
-      allData[currentCandle.tickerTf].trigger_Long = res.trigger;
-      if (res.startTrade) {
+      const isSetup = this.stratService.strategy_EngulfingRetested_Long(data, i, trigger_Long);
+      if (isSetup) {
+        allData[currentCandle.tickerTf].trigger_Long = isSetup;
+      }
+
+      const res = this.stratService.trigger_EngulfingRetested_Long(trigger_Long, currentCandle);
+      if (res) {
         allData[currentCandle.tickerTf].inLong = true;
+        allData[currentCandle.tickerTf].trigger_Long.canceled = true;
         allData[currentCandle.tickerTf].entryPrice_Long = this.utils.round(res.entryPrice, 5);
         allData[currentCandle.tickerTf].initialStopLoss_Long = allData[currentCandle.tickerTf].updatedStopLoss_Long = this.utils.round(res.stopLoss, 5);
-        allData[currentCandle.tickerTf].takeProfit_Long = this.utils.round(res.entryPrice + (res.entryPrice - res.stopLoss) * 2, 5);
+        allData[currentCandle.tickerTf].takeProfit_Long = this.utils.round(res.entryPrice + (res.entryPrice - res.stopLoss) * rrTarget, 5);
         if (this.logEnable) {
           console.log('--------');
+          console.log('Bullish Engulfing', data[res.trigger.time]);
           console.log('Long', data[i].tickerTf, data[i].date);
-          console.log('entryPrice', allData[currentCandle.tickerTf].entryPrice_Long);
-          console.log('stopLoss', allData[currentCandle.tickerTf].initialStopLoss_Long);
-          console.log('takeProfit', allData[currentCandle.tickerTf].takeProfit_Long);
+          console.log('EntryPrice', allData[currentCandle.tickerTf].entryPrice_Long);
+          console.log('StopLoss', allData[currentCandle.tickerTf].initialStopLoss_Long);
+          console.log('TakeProfit', allData[currentCandle.tickerTf].takeProfit_Long);
         }
       }
     }
@@ -111,15 +118,21 @@ class App extends CandleAbstract {
       rr = this.stratService.getFixedTakeProfitAndStopLoss('SHORT', data, i, entryPrice_Short, initialStopLoss_Short, takeProfit_Short, currentCandle);
       this.updateResults('SHORT', rr, currentCandle);
     } else {
-      const res = this.stratService.strategy_EngulfingRetested_Short(data, i, trigger_Short, currentCandle);
-      allData[currentCandle.tickerTf].trigger_Short = res.trigger;
-      if (res.startTrade) {
+      const isSetup = this.stratService.strategy_EngulfingRetested_Short(data, i, trigger_Short);
+      if (isSetup) {
+        allData[currentCandle.tickerTf].trigger_Short = isSetup;
+      }
+
+      const res = this.stratService.trigger_EngulfingRetested_Short(trigger_Short, currentCandle);
+      if (res) {
         allData[currentCandle.tickerTf].inShort = true;
+        allData[currentCandle.tickerTf].trigger_Short.canceled = true;
         allData[currentCandle.tickerTf].entryPrice_Short = this.utils.round(res.entryPrice, 5);
         allData[currentCandle.tickerTf].initialStopLoss_Short = allData[currentCandle.tickerTf].updatedStopLoss_Short = this.utils.round(res.stopLoss, 5);
-        allData[currentCandle.tickerTf].takeProfit_Short = this.utils.round(res.entryPrice + (res.entryPrice - res.stopLoss) * 2, 5);
+        allData[currentCandle.tickerTf].takeProfit_Short = this.utils.round(res.entryPrice + (res.entryPrice - res.stopLoss) * rrTarget, 5);
         if (this.logEnable) {
           console.log('--------');
+          console.log('Bearish Engulfing', data[allData[currentCandle.tickerTf].trigger_Short.time].date);
           console.log('Short', data[i].tickerTf, data[i].date);
           console.log('entryPrice', allData[currentCandle.tickerTf].entryPrice_Short);
           console.log('stopLoss', allData[currentCandle.tickerTf].initialStopLoss_Short);

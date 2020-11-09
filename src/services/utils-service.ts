@@ -162,8 +162,8 @@ export class UtilsService {
       const tickerTf = this.getTickerTimeframe(array[i]);
       allData[tickerTf] = [];
       allData[tickerTf].ohlc = [];
-      allData[tickerTf].trigger_Long = [];
-      allData[tickerTf].trigger_Short = [];
+      allData[tickerTf].trigger_Long = undefined;
+      allData[tickerTf].trigger_Short = undefined;
       allData[tickerTf].inLong = false;
       allData[tickerTf].inShort = false;
       allData[tickerTf].entryPrice_Long = 0;

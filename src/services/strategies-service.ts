@@ -199,76 +199,64 @@ export class StrategiesService extends CandleAbstract {
   }
 
 
-  strategy_EngulfingRetested_Long(data: any, i: number, trigger: any, currentCandle: any): any {
-    let sl: number;
-    let entryPrice: number;
-    let startTrade = false;
-    const maxTimeSpent = 20;
-    const lastTrigger = trigger[trigger.length - 1]; // VARIABLE LOCALE
+  trigger_EngulfingRetested_Long(trigger: any, currentCandle: any): any {
+    if (trigger && !trigger.canceled && currentCandle.close <= trigger.candle1.open) {
+      return {
+        stopLoss: trigger.candle1.low,
+        entryPrice: trigger.candle1.open,
+      };
+    }
+  }
+
+  strategy_EngulfingRetested_Long(data: any, i: number, trigger: any): any {
     const candle0Size = Math.abs(this.close(data, i, 0) - this.open(data, i, 0));
     const candle1Size = Math.abs(this.close(data, i, 1) - this.open(data, i, 1));
-    const liquidity = this.low(data, i, 0) < this.low(data, i, 1);
-    const breakout = this.close(data, i, 0) > this.high(data, i, 1);
-    const setup1 = !this.isUp(data, i, 1) && this.isUp(data, i, 0) && (candle0Size >= candle1Size * 2) /*&& liquidity*/ && breakout;
+    const isHigherHigh = this.high(data, i, 1) < this.high(data, i, 0); // anti gap
+    //const isLongEnough0 = (candle0Size / atr[i]) > 0.6;
+    //const isLongEnough1 = (candle1Size / atr[i]) > 0.1;
+    const setup = !this.isUp(data, i, 1) && this.isUp(data, i, 0) && (candle0Size >= candle1Size * 3) && isHigherHigh;
 
-    if (lastTrigger && !lastTrigger.canceled) {
-      const timeSpent = i - lastTrigger.time;
-      if (timeSpent <= maxTimeSpent && currentCandle.close <= lastTrigger.candle1.open) {
-        startTrade = true;
-        sl = lastTrigger.candle1.low;
-        entryPrice = lastTrigger.candle1.open;
-        trigger[trigger.length - 1].canceled = true;
-      } else if (timeSpent > maxTimeSpent) {
-        trigger[trigger.length - 1].canceled = true;
-      }
-    } else if (setup1 && (lastTrigger === undefined || (lastTrigger.canceled && i !== lastTrigger.time))) {
-      console.log('Bull engulfing', currentCandle.date, currentCandle.tickerTf);
-      trigger.push({ time: i, canceled: false, candle1: data[i - 1], candle0: data[i] });
+    if (setup && (trigger === undefined || (trigger.canceled && i !== trigger.time))) {
+      return {
+        time: i,
+        canceled: false,
+        candle1: data[i - 1],
+        candle0: data[i]
+      };
     }
-
-    return {
-      startTrade: startTrade,
-      stopLoss: sl,
-      entryPrice: entryPrice,
-      trigger: trigger
-    };
   }
 
 
-  strategy_EngulfingRetested_Short(data: any, i: number, trigger: any, currentCandle: any): any {
-    let sl: number;
-    let entryPrice: number;
-    let startTrade = false;
-    const maxTimeSpent = 20;
-    const lastTrigger = trigger[trigger.length - 1];
+  strategy_EngulfingRetested_Short(data: any, i: number, trigger: any): any {
     const candle0Size = Math.abs(this.close(data, i, 0) - this.open(data, i, 0));
     const candle1Size = Math.abs(this.close(data, i, 1) - this.open(data, i, 1));
-    const liquidity = this.high(data, i, 0) > this.high(data, i, 1);
-    const breakout = this.close(data, i, 0) < this.low(data, i, 1);
-    const setup1 = this.isUp(data, i, 1) && !this.isUp(data, i, 0) && (candle0Size >= candle1Size * 2) /*&& liquidity*/ && breakout;
+    const isLowerLow = this.low(data, i, 1) > this.low(data, i, 0); // anti gap
+    //const isLongEnough0 = (candle0Size / atr[i]) > 0.6;
+    //const isLongEnough1 = (candle1Size / atr[i]) > 0.1;
+    const setup = this.isUp(data, i, 1) && !this.isUp(data, i, 0) && (candle0Size >= candle1Size * 3) && isLowerLow;
 
-    if (lastTrigger && !lastTrigger.canceled) {
-      const timeSpent = i - lastTrigger.time;
-      if (timeSpent <= maxTimeSpent && currentCandle.close >= lastTrigger.candle1.open) {
-        startTrade = true;
-        sl = lastTrigger.candle1.high;
-        entryPrice = lastTrigger.candle1.open;
-        trigger[trigger.length - 1].canceled = true;
-      } else if (timeSpent > maxTimeSpent) {
-        trigger[trigger.length - 1].canceled = true;
-      }
-    } else if (setup1 && (lastTrigger === undefined || (lastTrigger.canceled && i !== lastTrigger.time))) {
-      console.log('Short engulfing', currentCandle.date, currentCandle.tickerTf);
-      trigger.push({ time: i, canceled: false, candle1: data[i - 1], candle0: data[i] });
+    if (setup && (trigger === undefined || (trigger.canceled && i !== trigger.time))) {
+      return {
+        time: i,
+        canceled: false,
+        candle1: data[i - 1],
+        candle0: data[i]
+      };
     }
-
-    return {
-      startTrade: startTrade,
-      stopLoss: sl,
-      entryPrice: entryPrice,
-      trigger: trigger
-    };
   }
+
+  trigger_EngulfingRetested_Short(trigger: any, currentCandle: any): any {
+    if (trigger && !trigger.canceled && currentCandle.close >= trigger.candle1.open) {
+      return {
+        stopLoss: trigger.candle1.high,
+        entryPrice: trigger.candle1.open,
+      };
+    }
+  }
+
+
+
+
 }
 
 export default new StrategiesService(new UtilsService());
