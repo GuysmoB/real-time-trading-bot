@@ -14,22 +14,86 @@ let allData = [];
 let winTrades = [];
 let loseTrades = [];
 let allTrades = [];
-let haData = [];
 
-/*const items = [
+// CANDLESTICK BUILDER
+const timeProcessed = [];
+let currentTick: number;
+let previousTick: number;
+
+const timeFrameArray = [1, 5, 15, 45, 60];
+const items = [
   'CHART:CS.D.EURGBP.CFD.IP:1MINUTE', 'CHART:CS.D.BITCOIN.CFD.IP:1MINUTE', 'CHART:CS.D.EURUSD.CFD.IP:1MINUTE', 'CHART:CS.D.GBPUSD.CFD.IP:1MINUTE',
   'CHART:CS.D.AUDUSD.CFD.IP:1MINUTE', 'CHART:CS.D.EURJPY.CFD.IP:1MINUTE', 'CHART:CS.D.USDCAD.CFD.IP:1MINUTE', 'CHART:CS.D.USDCHF.CFD.IP:1MINUTE',
   'CHART:CS.D.EURCHF.CFD.IP:1MINUTE', 'CHART:CS.D.GBPJPY.CFD.IP:1MINUTE', 'CHART:CS.D.EURCAD.CFD.IP:1MINUTE', 'CHART:CS.D.CADJPY.CFD.IP:1MINUTE',
   'CHART:CS.D.GBPCHF.CFD.IP:1MINUTE', 'CHART:CS.D.CHFJPY.CFD.IP:1MINUTE', 'CHART:CS.D.GBPCAD.CFD.IP:1MINUTE', 'CHART:CS.D.CADCHF.CFD.IP:1MINUTE',
   'CHART:CS.D.EURAUD.CFD.IP:1MINUTE', 'CHART:CS.D.AUDJPY.CFD.IP:1MINUTE', 'CHART:CS.D.AUDCAD.CFD.IP:1MINUTE', 'CHART:CS.D.AUDCHF.CFD.IP:1MINUTE',
-  'CHART:CS.D.NZDUSD.CFD.IP:1MINUTE', 'CHART:CS.D.GBPNZD.CFD.IP:1MINUTE', 'CHART:CS.D.GBPAUD.CFD.IP:1MINUTE', 'CHART:CS.D.AUDNZD.CFD.IP:1MINUTE'];*/
-const items = ['MARKET:CS.D.EURGBP.CFD.IP', 'MARKET:CS.D.USDGBP.CFD.IP'];
+  'CHART:CS.D.NZDUSD.CFD.IP:1MINUTE', 'CHART:CS.D.GBPNZD.CFD.IP:1MINUTE', 'CHART:CS.D.GBPAUD.CFD.IP:1MINUTE', 'CHART:CS.D.AUDNZD.CFD.IP:1MINUTE'];
+const itemsTest = ['MARKET:CS.D.EURGBP.CFD.IP', 'MARKET:CS.D.GBPUSD.CFD.IP'];
 
 class App extends CandleAbstract {
   constructor(private utils: UtilsService, private stratService: StrategiesService) {
     super();
-    allData = this.utils.dataArrayBuilder(items, allData);
-    this.init();
+    allData = this.utils.dataArrayBuilderTest(itemsTest, allData, timeFrameArray);
+    //allData = this.utils.dataArrayBuilder(items, allData);
+    //this.init();
+
+
+
+    this.test();
+  }
+
+
+  async test(): Promise<void> {
+    try {
+      await ig.login(true);
+      ig.connectToLightstreamer();
+      ig.subscribeToLightstreamer('MERGE', itemsTest, ['BID', 'OFFER'], 5);
+      ig.lsEmitter.on('update', (streamData: any) => {
+        const minuteTimestamp = Math.trunc((Date.now() / 60000));
+        const ticker = this.utils.getTicker(streamData[1]);
+        const price = this.utils.round(parseFloat(streamData[2]) + (parseFloat(streamData[3]) - parseFloat(streamData[2])) / 2, 5);
+        previousTick = currentTick; //util ?
+        currentTick = price;
+
+        for (let i = 0; i < timeFrameArray.length; i++) {
+          const timeFrame = timeFrameArray[i];
+          const tickerTf = ticker + '_' + timeFrame + 'MINUTE';
+
+          if (minuteTimestamp % timeFrame === 0 && !timeProcessed.find(element => element === minuteTimestamp)) {
+            timeProcessed.push(minuteTimestamp);
+            if (allData[tickerTf].ohlc.length > 0) {
+              const lastCandle = allData[tickerTf].ohlc.length - 1;
+              allData[tickerTf].ohlc[lastCandle].close = price;
+              console.log('Candlestick |', allData[tickerTf].ohlc[lastCandle].date,
+                tickerTf, allData[tickerTf].ohlc[lastCandle].open, allData[tickerTf].ohlc[lastCandle].high,
+                allData[tickerTf].ohlc[lastCandle].low, allData[tickerTf].ohlc[lastCandle].close)
+            }
+            allData[tickerTf].ohlc.push({
+              date: streamData[0],
+              /*tickerTf: tickerTf,*/
+              open: price,
+              high: price,
+              low: price,
+            });
+          }
+
+          if (allData[tickerTf].ohlc.length > 0) {
+            const lastCandle = allData[tickerTf].ohlc.length - 1;
+            let currentCandlestick = allData[tickerTf].ohlc[lastCandle];
+            if (price > currentCandlestick.high) {
+              currentCandlestick.high = price;
+            }
+            if (price < currentCandlestick.low) {
+              currentCandlestick.low = price;
+            }
+          }
+        }
+
+
+      });
+    } catch (error) {
+      console.error(error); 1
+    }
   }
 
 

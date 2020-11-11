@@ -1088,7 +1088,9 @@ function subscribeToLightstreamer(subscriptionMode, items, fields, maxFreq) {
 
 			onItemUpdate: updateInfo => {
 				let data = [];
-				data.push(new Date());
+				let date = new Date();
+				date.setHours(date.getHours() + 1);
+				data.push(date);
 				data.push(updateInfo.getItemName());
 				updateInfo.forEachField((fieldName, fieldPos, value) => {
 					//console.log('Field: ' + fieldName + " Value: " + value);

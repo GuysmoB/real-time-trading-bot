@@ -179,14 +179,44 @@ export class UtilsService {
   }
 
 
+  dataArrayBuilderTest(array: any, allData: any, timeFrame: any) {
+    for (let i = 0; i < array.length; i++) {
+      for (let j = 0; j < timeFrame.length; j++) {
+        const tickerTf = this.getTicker(array[i]) + '_' + timeFrame[j] + 'MINUTE';
+        allData[tickerTf] = [];
+        allData[tickerTf].ohlc = [];
+        allData[tickerTf].snapshot_Long = undefined;
+        allData[tickerTf].snapshot_Short = undefined;
+        allData[tickerTf].inLong = false;
+        allData[tickerTf].inShort = false;
+        allData[tickerTf].entryPrice_Long = 0;
+        allData[tickerTf].entryPrice_Short = 0;
+        allData[tickerTf].initialStopLoss_Long = 0;
+        allData[tickerTf].initialStopLoss_Short = 0;
+        allData[tickerTf].updatedStopLoss_Long = 0;
+        allData[tickerTf].updatedStopLoss_Short = 0;
+        allData[tickerTf].takeProfit_Long = 0;
+        allData[tickerTf].takeProfit_Short = 0;
+      }
+    }
+    return allData;
+  }
+
   /**
    * Retourne le ticker timeframe.
    */
   getTickerTimeframe(string: string) {
     const str = string.split('.');
-    const ticker = str[2];
     const tf = str[4].split(':');
-    return ticker + '_' + tf[1];
+    return this.getTicker(string) + '_' + tf[1];
+  }
+
+  /**
+   * Retourne le ticker.
+   */
+  getTicker(string: string) {
+    const str = string.split('.');
+    return str[2];
   }
 
 
@@ -199,6 +229,14 @@ export class UtilsService {
   }
 
 
+  isTimeFrameMultiple(timeFrame: any, time: any): boolean {
+    const minuteTimestamp = this.round(time / 60000, 0);
+    if (minuteTimestamp % timeFrame === 0) {
+      return true;
+    } else {
+      return false;
+    }
+  }
 }
 
 export default new UtilsService();
