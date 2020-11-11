@@ -162,8 +162,8 @@ export class UtilsService {
       const tickerTf = this.getTickerTimeframe(array[i]);
       allData[tickerTf] = [];
       allData[tickerTf].ohlc = [];
-      allData[tickerTf].trigger_Long = undefined;
-      allData[tickerTf].trigger_Short = undefined;
+      allData[tickerTf].snapshot_Long = undefined;
+      allData[tickerTf].snapshot_Short = undefined;
       allData[tickerTf].inLong = false;
       allData[tickerTf].inShort = false;
       allData[tickerTf].entryPrice_Long = 0;
@@ -199,13 +199,6 @@ export class UtilsService {
   }
 
 
-  getLastElement(array: any) {
-    return array[array.length - 1];
-  }
-
-  setLastElement(array): any {
-
-  }
 }
 
 export default new UtilsService();
