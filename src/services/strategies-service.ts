@@ -66,39 +66,43 @@ export class StrategiesService extends CandleAbstract {
   }
 
   strategy_EngulfingRetested_Long(data: any, i: number, snapshot: any): any {
-    const candle0Size = Math.abs(this.close(data, i, 0) - this.open(data, i, 0));
-    const candle1Size = Math.abs(this.close(data, i, 1) - this.open(data, i, 1));
-    const isHigherHigh = this.high(data, i, 1) < this.high(data, i, 0); // anti gap
-    //const isLongEnough0 = (candle0Size / atr[i]) > 0.6;
-    //const isLongEnough1 = (candle1Size / atr[i]) > 0.1;
-    const setup = !this.isUp(data, i, 1) && this.isUp(data, i, 0) && (candle0Size >= candle1Size * 3) && isHigherHigh;
+    if (data.length >= 2) {
+      const candle0Size = Math.abs(this.close(data, i, 0) - this.open(data, i, 0));
+      const candle1Size = Math.abs(this.close(data, i, 1) - this.open(data, i, 1));
+      const isHigherHigh = this.high(data, i, 1) < this.high(data, i, 0); // anti gap
+      //const isLongEnough0 = (candle0Size / atr[i]) > 0.6;
+      //const isLongEnough1 = (candle1Size / atr[i]) > 0.1;
+      const setup = !this.isUp(data, i, 1) && this.isUp(data, i, 0) && (candle0Size >= candle1Size * 3) && isHigherHigh;
 
-    if (setup && (snapshot === undefined || (i !== snapshot.time))) {
-      return {
-        time: i,
-        canceled: false,
-        candle1: data[i - 1],
-        candle0: data[i]
-      };
+      if (setup && (snapshot === undefined || (i !== snapshot.time))) {
+        return {
+          time: i,
+          canceled: false,
+          candle1: data[i - 1],
+          candle0: data[i]
+        };
+      }
     }
   }
 
 
   strategy_EngulfingRetested_Short(data: any, i: number, snapshot: any): any {
-    const candle0Size = Math.abs(this.close(data, i, 0) - this.open(data, i, 0));
-    const candle1Size = Math.abs(this.close(data, i, 1) - this.open(data, i, 1));
-    const isLowerLow = this.low(data, i, 1) > this.low(data, i, 0); // anti gap
-    //const isLongEnough0 = (candle0Size / atr[i]) > 0.6;
-    //const isLongEnough1 = (candle1Size / atr[i]) > 0.1;
-    const setup = this.isUp(data, i, 1) && !this.isUp(data, i, 0) && (candle0Size >= candle1Size * 3) && isLowerLow;
+    if (data.length >= 2) {
+      const candle0Size = Math.abs(this.close(data, i, 0) - this.open(data, i, 0));
+      const candle1Size = Math.abs(this.close(data, i, 1) - this.open(data, i, 1));
+      const isLowerLow = this.low(data, i, 1) > this.low(data, i, 0); // anti gap
+      //const isLongEnough0 = (candle0Size / atr[i]) > 0.6;
+      //const isLongEnough1 = (candle1Size / atr[i]) > 0.1;
+      const setup = this.isUp(data, i, 1) && !this.isUp(data, i, 0) && (candle0Size >= candle1Size * 3) && isLowerLow;
 
-    if (setup && (snapshot === undefined || (i !== snapshot.time))) {
-      return {
-        time: i,
-        canceled: false,
-        candle1: data[i - 1],
-        candle0: data[i]
-      };
+      if (setup && (snapshot === undefined || (i !== snapshot.time))) {
+        return {
+          time: i,
+          canceled: false,
+          candle1: data[i - 1],
+          candle0: data[i]
+        };
+      }
     }
   }
 

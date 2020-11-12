@@ -15,30 +15,30 @@ let winTrades = [];
 let loseTrades = [];
 let allTrades = [];
 
-// CANDLESTICK BUILDER
-const timeProcessed = [];
-let currentTick: number;
-let previousTick: number;
-
-const timeFrameArray = [1, 5, 15, 45, 60];
-const items = [
+const timeFrameArray = [1, 2, 5, 15, 45, 60];
+/* const items = [
   'CHART:CS.D.EURGBP.CFD.IP:1MINUTE', 'CHART:CS.D.BITCOIN.CFD.IP:1MINUTE', 'CHART:CS.D.EURUSD.CFD.IP:1MINUTE', 'CHART:CS.D.GBPUSD.CFD.IP:1MINUTE',
   'CHART:CS.D.AUDUSD.CFD.IP:1MINUTE', 'CHART:CS.D.EURJPY.CFD.IP:1MINUTE', 'CHART:CS.D.USDCAD.CFD.IP:1MINUTE', 'CHART:CS.D.USDCHF.CFD.IP:1MINUTE',
   'CHART:CS.D.EURCHF.CFD.IP:1MINUTE', 'CHART:CS.D.GBPJPY.CFD.IP:1MINUTE', 'CHART:CS.D.EURCAD.CFD.IP:1MINUTE', 'CHART:CS.D.CADJPY.CFD.IP:1MINUTE',
   'CHART:CS.D.GBPCHF.CFD.IP:1MINUTE', 'CHART:CS.D.CHFJPY.CFD.IP:1MINUTE', 'CHART:CS.D.GBPCAD.CFD.IP:1MINUTE', 'CHART:CS.D.CADCHF.CFD.IP:1MINUTE',
   'CHART:CS.D.EURAUD.CFD.IP:1MINUTE', 'CHART:CS.D.AUDJPY.CFD.IP:1MINUTE', 'CHART:CS.D.AUDCAD.CFD.IP:1MINUTE', 'CHART:CS.D.AUDCHF.CFD.IP:1MINUTE',
-  'CHART:CS.D.NZDUSD.CFD.IP:1MINUTE', 'CHART:CS.D.GBPNZD.CFD.IP:1MINUTE', 'CHART:CS.D.GBPAUD.CFD.IP:1MINUTE', 'CHART:CS.D.AUDNZD.CFD.IP:1MINUTE'];
-const itemsTest = ['MARKET:CS.D.EURGBP.CFD.IP', 'MARKET:CS.D.GBPUSD.CFD.IP'];
+  'CHART:CS.D.NZDUSD.CFD.IP:1MINUTE', 'CHART:CS.D.GBPNZD.CFD.IP:1MINUTE', 'CHART:CS.D.GBPAUD.CFD.IP:1MINUTE', 'CHART:CS.D.AUDNZD.CFD.IP:1MINUTE']; */
+const items = [
+  'MARKET:CS.D.EURGBP.CFD.IP', 'MARKET:CS.D.BITCOIN.CFD.IP', 'MARKET:CS.D.EURUSD.CFD.IP', 'MARKET:CS.D.GBPUSD.CFD.IP',
+  'MARKET:CS.D.AUDUSD.CFD.IP', 'MARKET:CS.D.EURJPY.CFD.IP', 'MARKET:CS.D.USDCAD.CFD.IP', 'MARKET:CS.D.USDCHF.CFD.IP',
+  'MARKET:CS.D.EURCHF.CFD.IP', 'MARKET:CS.D.GBPJPY.CFD.IP', 'MARKET:CS.D.EURCAD.CFD.IP', 'MARKET:CS.D.CADJPY.CFD.IP',
+  'MARKET:CS.D.GBPCHF.CFD.IP', 'MARKET:CS.D.CHFJPY.CFD.IP', 'MARKET:CS.D.GBPCAD.CFD.IP', 'MARKET:CS.D.CADCHF.CFD.IP',
+  'MARKET:CS.D.EURAUD.CFD.IP', 'MARKET:CS.D.AUDJPY.CFD.IP', 'MARKET:CS.D.AUDCAD.CFD.IP', 'MARKET:CS.D.AUDCHF.CFD.IP',
+  'MARKET:CS.D.NZDUSD.CFD.IP', 'MARKET:CS.D.GBPNZD.CFD.IP', 'MARKET:CS.D.GBPAUD.CFD.IP', 'MARKET:CS.D.AUDNZD.CFD.IP'];
+//const items = ['MARKET:CS.D.EURGBP.CFD.IP', 'MARKET:CS.D.GBPUSD.CFD.IP'];
 
 class App extends CandleAbstract {
   constructor(private utils: UtilsService, private stratService: StrategiesService) {
     super();
-    allData = this.utils.dataArrayBuilderTest(itemsTest, allData, timeFrameArray);
+    allData = this.utils.dataArrayBuilderTest(items, allData, timeFrameArray);
+    //timeProcessed = this.utils.timeProcessedArrayBuilder(itemsTest, timeProcessed, timeFrameArray);
     //allData = this.utils.dataArrayBuilder(items, allData);
     //this.init();
-
-
-
     this.test();
   }
 
@@ -47,52 +47,36 @@ class App extends CandleAbstract {
     try {
       await ig.login(true);
       ig.connectToLightstreamer();
-      ig.subscribeToLightstreamer('MERGE', itemsTest, ['BID', 'OFFER'], 5);
+      ig.subscribeToLightstreamer('MERGE', items, ['BID', 'OFFER'], 3);
       ig.lsEmitter.on('update', (streamData: any) => {
-        const minuteTimestamp = Math.trunc((Date.now() / 60000));
+        //const minuteTimestamp = Math.trunc((Date.now() / 60000));
         const ticker = this.utils.getTicker(streamData[1]);
         const price = this.utils.round(parseFloat(streamData[2]) + (parseFloat(streamData[3]) - parseFloat(streamData[2])) / 2, 5);
-        previousTick = currentTick; //util ?
-        currentTick = price;
 
-        for (let i = 0; i < timeFrameArray.length; i++) {
-          const timeFrame = timeFrameArray[i];
-          const tickerTf = ticker + '_' + timeFrame + 'MINUTE';
-
-          if (minuteTimestamp % timeFrame === 0 && !timeProcessed.find(element => element === minuteTimestamp)) {
-            timeProcessed.push(minuteTimestamp);
-            if (allData[tickerTf].ohlc.length > 0) {
-              const lastCandle = allData[tickerTf].ohlc.length - 1;
-              allData[tickerTf].ohlc[lastCandle].close = price;
-              console.log('Candlestick |', allData[tickerTf].ohlc[lastCandle].date,
-                tickerTf, allData[tickerTf].ohlc[lastCandle].open, allData[tickerTf].ohlc[lastCandle].high,
-                allData[tickerTf].ohlc[lastCandle].low, allData[tickerTf].ohlc[lastCandle].close)
-            }
-            allData[tickerTf].ohlc.push({
-              date: streamData[0],
-              /*tickerTf: tickerTf,*/
-              open: price,
-              high: price,
-              low: price,
-            });
-          }
-
-          if (allData[tickerTf].ohlc.length > 0) {
-            const lastCandle = allData[tickerTf].ohlc.length - 1;
-            let currentCandlestick = allData[tickerTf].ohlc[lastCandle];
-            if (price > currentCandlestick.high) {
-              currentCandlestick.high = price;
-            }
-            if (price < currentCandlestick.low) {
-              currentCandlestick.low = price;
-            }
-          }
+        this.CandlestickBuilder(timeFrameArray, ticker, price, streamData[0]);
+        const currentCandle = {
+          date: streamData[0],
+          close: price
         }
+        for (const timeFrame of timeFrameArray) {
+          const tickerTf = ticker + '_' + timeFrame + 'MINUTE';
+          //console.log(tickerTf)
+
+          try {
+            this.runStrategyTest(currentCandle, tickerTf);
+          } catch (error) {
+            console.error(error);
+          }
+
+
+
+        }
+
 
 
       });
     } catch (error) {
-      console.error(error); 1
+      console.error(error);
     }
   }
 
@@ -202,6 +186,74 @@ class App extends CandleAbstract {
 
 
   /**
+   * Execution de la stratégie principale.
+   */
+  runStrategyTest(currentCandle: any, tickerTf: string) {
+    let rr: number;
+    const rrTarget = 2;
+    const data = allData[tickerTf].ohlc;
+    const i = allData[tickerTf].ohlc.length - 1;
+    const inLong = this.getDirection_Long(tickerTf);
+    const inShort = this.getDirection_Short(tickerTf);
+
+    if (inLong) {
+      rr = this.stratService.getFixedTakeProfitAndStopLoss('LONG', this.getTickerTfData(tickerTf), currentCandle);
+      this.updateResults('LONG', rr, tickerTf);
+    } else {
+      const isSetup = this.stratService.strategy_EngulfingRetested_Long(data, i, this.getSnapshot_Long(tickerTf));
+      if (isSetup) {
+        this.setSnapshot_Long(tickerTf, isSetup);
+      }
+
+      const res = this.stratService.trigger_EngulfingRetested_Long(this.getSnapshot_Long(tickerTf), currentCandle);
+      if (res) {
+        this.setDirection_Long(tickerTf, true);
+        this.setTriggerCanceled_Long(tickerTf, true);
+        this.setEntryPrice_Long(tickerTf, this.utils.round(res.entryPrice, 5));
+        this.setStopLoss_Long(tickerTf, this.utils.round(res.stopLoss, 5));
+        this.setTakeProfit_Long(tickerTf, this.utils.round(res.entryPrice + (res.entryPrice - res.stopLoss) * rrTarget, 5));
+
+        if (this.logEnable) {
+          console.log('--------');
+          console.log('Bullish Engulfing', data[this.getSnapshot_Long(tickerTf).time].date);
+          console.log('Long', tickerTf, currentCandle.date);
+          console.log('entryPrice', this.getEntryPrice_Long(tickerTf));
+          console.log('stopLoss', this.getStopLoss_Long(tickerTf));
+          console.log('takeProfit', this.getTakeProfit_Long(tickerTf));
+        }
+      }
+    }
+
+    if (inShort) {
+      rr = this.stratService.getFixedTakeProfitAndStopLoss('SHORT', this.getTickerTfData(tickerTf), currentCandle);
+      this.updateResults('SHORT', rr, tickerTf);
+    } else {
+      const isSetup = this.stratService.strategy_EngulfingRetested_Short(data, i, this.getSnapshot_Short(tickerTf));
+      if (isSetup) {
+        this.setSnapshot_Short(tickerTf, isSetup);
+      }
+
+      const res = this.stratService.trigger_EngulfingRetested_Short(this.getSnapshot_Short(tickerTf), currentCandle);
+      if (res) {
+        this.setDirection_Short(tickerTf, true);
+        this.setTriggerCanceled_Short(tickerTf, true);
+        this.setEntryPrice_Short(tickerTf, this.utils.round(res.entryPrice, 5));
+        this.setStopLoss_Short(tickerTf, this.utils.round(res.stopLoss, 5));
+        this.setTakeProfit_Short(tickerTf, this.utils.round(res.entryPrice + (res.entryPrice - res.stopLoss) * rrTarget, 5));
+
+        if (this.logEnable) {
+          console.log('--------');
+          console.log('Bearish Engulfing', data[this.getSnapshot_Short(tickerTf).time].date);
+          console.log('Short', tickerTf, currentCandle.date);
+          console.log('entryPrice', this.getEntryPrice_Short(tickerTf));
+          console.log('stopLoss', this.getStopLoss_Short(tickerTf));
+          console.log('takeProfit', this.getTakeProfit_Short(tickerTf));
+        }
+      }
+    }
+  }
+
+  /**
    * Update trades's state, global R:R and log.
    */
   updateResults(direction: string, rr: number, tickerTf: any) {
@@ -234,11 +286,41 @@ class App extends CandleAbstract {
 
 
 
-  getTickerTfData(tickerTf: any) {
-    return allData[tickerTf];
+  CandlestickBuilder(timeFrameArray: any, ticker: string, price: number, date: Date) {
+    const minuteTimestamp = Math.trunc((Date.now() / 60000));
+
+    for (const timeFrame of timeFrameArray) {
+      const tickerTf = ticker + '_' + timeFrame + 'MINUTE';
+
+      if (minuteTimestamp % timeFrame === 0 && !allData[tickerTf].timeProcessed.find((element: any) => element === minuteTimestamp)) {
+        allData[tickerTf].timeProcessed.push(minuteTimestamp);
+
+        if (allData[tickerTf].ohlc_tmp) {
+          const lastCandle = allData[tickerTf].ohlc_tmp;
+          lastCandle.close = price;
+          allData[tickerTf].ohlc.push(lastCandle);
+          // Ici recherche de setup par rapport aux candles deja closes
+          //console.log('Candlestick |', lastCandle.date, tickerTf, lastCandle.open, lastCandle.high, lastCandle.low, lastCandle.close)
+        }
+        allData[tickerTf].ohlc_tmp = { date: date, open: price, high: price, low: price };
+      }
+
+      if (allData[tickerTf].ohlc_tmp) {
+        let currentCandlestick = allData[tickerTf].ohlc_tmp;
+        if (price > currentCandlestick.high) {
+          currentCandlestick.high = price;
+        }
+        if (price < currentCandlestick.low) {
+          currentCandlestick.low = price;
+        }
+      }
+    }
   }
 
 
+  getTickerTfData(tickerTf: any) {
+    return allData[tickerTf];
+  }
   getDirection_Long(tickerTf: any) {
     return allData[tickerTf].inLong;
   }

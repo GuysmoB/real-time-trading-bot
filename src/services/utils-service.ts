@@ -179,12 +179,24 @@ export class UtilsService {
   }
 
 
-  dataArrayBuilderTest(array: any, allData: any, timeFrame: any) {
+  timeProcessedArrayBuilder(array: any, timeProcessed: any, timeFrame: any) {
     for (let i = 0; i < array.length; i++) {
       for (let j = 0; j < timeFrame.length; j++) {
         const tickerTf = this.getTicker(array[i]) + '_' + timeFrame[j] + 'MINUTE';
+        timeProcessed[tickerTf] = [];
+      }
+    }
+    return timeProcessed;
+  }
+
+
+  dataArrayBuilderTest(epic: any, allData: any, timeFrame: any) {
+    for (let i = 0; i < epic.length; i++) {
+      for (let j = 0; j < timeFrame.length; j++) {
+        const tickerTf = this.getTicker(epic[i]) + '_' + timeFrame[j] + 'MINUTE';
         allData[tickerTf] = [];
         allData[tickerTf].ohlc = [];
+        allData[tickerTf].timeProcessed = [];
         allData[tickerTf].snapshot_Long = undefined;
         allData[tickerTf].snapshot_Short = undefined;
         allData[tickerTf].inLong = false;
