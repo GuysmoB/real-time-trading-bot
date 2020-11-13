@@ -1,6 +1,9 @@
-import fs from "fs";
-import { promisify } from "util";
-import ig from "node-ig-api";
+import { promisify } from 'util';
+import firebase from 'firebase';
+import fs from 'fs';
+import ig from 'node-ig-api';
+import { error } from 'console';
+
 
 export class UtilsService {
   constructor() { }
@@ -11,10 +14,10 @@ export class UtilsService {
    */
   async getDataFromFile(): Promise<any> {
     const result = [];
-    const content = await promisify(fs.readFile)("src\\assets\\EURUSD60.csv", "UTF-8");
-    const csvToRowArray = content.split("\r\n");
+    const content = await promisify(fs.readFile)('src\\assets\\EURUSD60.csv', 'UTF-8');
+    const csvToRowArray = content.split('\r\n');
     for (let index = 1; index < csvToRowArray.length - 1; index++) {
-      const element = csvToRowArray[index].split("\t"); // d, o, h, l, c, v
+      const element = csvToRowArray[index].split('\t'); // d, o, h, l, c, v
       result.push({
         date: element[0],
         open: parseFloat(element[1]),
@@ -50,7 +53,12 @@ export class UtilsService {
    * Permet de retourner le R:R
    */
   getRiskReward(entryPrice: number, initialStopLoss: number, closedPrice: number): number {
-    return this.round(Math.abs(closedPrice - entryPrice) / Math.abs(entryPrice - initialStopLoss), 2);
+    const result = this.round(Math.abs(closedPrice - entryPrice) / Math.abs(entryPrice - initialStopLoss), 2);
+    if (isNaN(result)) {
+      return -1;
+    } else {
+      return result;
+    }
   }
 
 
@@ -154,43 +162,7 @@ export class UtilsService {
   }
 
 
-  /**
-   * Initialise le tableaux de référence.
-   */
-  dataArrayBuilder(array: any, allData: any) {
-    for (let i = 0; i < array.length; i++) {
-      const tickerTf = this.getTickerTimeframe(array[i]);
-      allData[tickerTf] = [];
-      allData[tickerTf].ohlc = [];
-      allData[tickerTf].snapshot_Long = undefined;
-      allData[tickerTf].snapshot_Short = undefined;
-      allData[tickerTf].inLong = false;
-      allData[tickerTf].inShort = false;
-      allData[tickerTf].entryPrice_Long = 0;
-      allData[tickerTf].entryPrice_Short = 0;
-      allData[tickerTf].initialStopLoss_Long = 0;
-      allData[tickerTf].initialStopLoss_Short = 0;
-      allData[tickerTf].updatedStopLoss_Long = 0;
-      allData[tickerTf].updatedStopLoss_Short = 0;
-      allData[tickerTf].takeProfit_Long = 0;
-      allData[tickerTf].takeProfit_Short = 0;
-    }
-    return allData;
-  }
-
-
-  timeProcessedArrayBuilder(array: any, timeProcessed: any, timeFrame: any) {
-    for (let i = 0; i < array.length; i++) {
-      for (let j = 0; j < timeFrame.length; j++) {
-        const tickerTf = this.getTicker(array[i]) + '_' + timeFrame[j] + 'MINUTE';
-        timeProcessed[tickerTf] = [];
-      }
-    }
-    return timeProcessed;
-  }
-
-
-  dataArrayBuilderTest(epic: any, allData: any, timeFrame: any) {
+  dataArrayBuilder(epic: any, allData: any, timeFrame: any) {
     for (let i = 0; i < epic.length; i++) {
       for (let j = 0; j < timeFrame.length; j++) {
         const tickerTf = this.getTicker(epic[i]) + '_' + timeFrame[j] + 'MINUTE';
@@ -236,19 +208,84 @@ export class UtilsService {
    * Permet d'arrêter le processus.
    */
   stopProcess() {
-    console.log('Process is about to stop');
+    console.log('Process will be stopped !');
     process.exit();
   }
 
 
-  isTimeFrameMultiple(timeFrame: any, time: any): boolean {
-    const minuteTimestamp = this.round(time / 60000, 0);
-    if (minuteTimestamp % timeFrame === 0) {
-      return true;
-    } else {
-      return false;
+  /**
+   * Retourne la date avec décalage horaire.
+   */
+  getDate(): any {
+    let date = new Date();
+    const year = date.getFullYear();
+    const month = '0' + date.getMonth();
+    const day = '0' + date.getDay();
+    const hours = '0' + date.getHours();
+    const minutes = '0' + date.getMinutes();
+    const second = '0' + date.getSeconds();
+    return day + '/' + month.substr(-2) + '/' + year + ' ' + hours.substr(-2) + ':' + minutes.substr(-2) + ':' + second.substr(-2);
+  }
+
+
+  /**
+   * Insert chaque trade dans Firebase.
+   */
+  insertTrade(tickerTfData: any, $tickerTf: string, $winTrades: any, $loseTrades: any, $allTrades: any) {
+    try {
+      let $direction: string;
+      let $entryTime: any;
+      let $entryPrice: number;
+      let $stopLoss: number;
+      let $takeProfit: number;
+      let time: number;
+
+      if (tickerTfData.inLong) {
+        $direction = 'Long';
+        $entryTime = tickerTfData.entryTime_Long;
+        $entryPrice = tickerTfData.entryPrice_Long;
+        $stopLoss = tickerTfData.initialStopLoss_Long;
+        $takeProfit = tickerTfData.takeProfit_Long;
+        time = tickerTfData.snapshot_Long.time;
+      } else if (tickerTfData.inShort) {
+        $direction = 'Short';
+        $entryTime = tickerTfData.entryTime_Short;
+        $entryPrice = tickerTfData.entryPrice_Short;
+        $stopLoss = tickerTfData.initialStopLoss_Short;
+        $takeProfit = tickerTfData.takeProfit_Short;
+        time = tickerTfData.snapshot_Short.time;
+      } else {
+        throw new error;
+      }
+
+      firebase.database().ref('/trade').push({
+        direction: $direction,
+        tickerTf: $tickerTf,
+        setupTime: tickerTfData.ohlc[time].date,
+        entryTime: $entryTime,
+        exitTime: this.getDate(),
+        entryPrice: $entryPrice,
+        stopLoss: $stopLoss,
+        takeProfit: $takeProfit,
+        rr: this.getRiskReward($entryPrice, $stopLoss, $takeProfit)
+      });
+
+      const $avgRR = this.round($allTrades.reduce((a, b) => a + b, 0) / $allTrades.length, 2);
+      const $winrate = this.round(($winTrades.length / ($loseTrades.length + $winTrades.length)) * 100, 2) + '%';
+      firebase.database().ref('/results').remove();
+      firebase.database().ref('/results').push({
+        winTrades: $winTrades.length,
+        loseTrades: $loseTrades.length,
+        totalTrades: $winTrades.length + $loseTrades.length,
+        totalRR: this.round($loseTrades.reduce((a, b) => a + b, 0) + $winTrades.reduce((a, b) => a + b, 0), 2),
+        avgRR: $avgRR ? $avgRR : 0,
+        winrate: $winrate ? $winrate : 0
+      });
+    } catch (error) {
+      throw error;
     }
   }
+
 }
 
 export default new UtilsService();

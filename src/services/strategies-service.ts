@@ -25,7 +25,7 @@ export class StrategiesService extends CandleAbstract {
 
 
 
-  getFixedTakeProfitAndStopLoss(direction: string, tickerTfData: any, currentCandle: any): number {
+  getFixedTakeProfitAndStopLoss(direction: string, tickerTfData: any, price: number): number {
     let result: number;
 
     if (direction === 'LONG') {
@@ -33,9 +33,9 @@ export class StrategiesService extends CandleAbstract {
       const initialStopLoss = tickerTfData.initialStopLoss_Long;
       const takeProfit = tickerTfData.takeProfit_Long;
 
-      if (currentCandle.close >= takeProfit) {
+      if (price >= takeProfit) {
         result = this.utils.getRiskReward(entryPrice, initialStopLoss, takeProfit);
-      } else if (currentCandle.close <= initialStopLoss) {
+      } else if (price <= initialStopLoss) {
         result = -1;
       }
     } else if (direction === 'SHORT') {
@@ -43,9 +43,9 @@ export class StrategiesService extends CandleAbstract {
       const initialStopLoss = tickerTfData.initialStopLoss_Short;
       const takeProfit = tickerTfData.takeProfit_Short;
 
-      if (currentCandle.close <= takeProfit) {
+      if (price <= takeProfit) {
         result = this.utils.getRiskReward(entryPrice, initialStopLoss, takeProfit);
-      } else if (currentCandle.close >= initialStopLoss) {
+      } else if (price >= initialStopLoss) {
         result = -1;
       }
     } else {
@@ -56,8 +56,9 @@ export class StrategiesService extends CandleAbstract {
   }
 
 
-  trigger_EngulfingRetested_Long(snapshot: any, currentCandle: any): any {
-    if (snapshot && !snapshot.canceled && currentCandle.close <= snapshot.candle1.open) {
+  trigger_EngulfingRetested_Long(snapshot: any, price: number): any {
+    // ici condition pour limit ou market
+    if (snapshot && !snapshot.canceled && price <= snapshot.candle1.open) {
       return {
         stopLoss: snapshot.candle1.low,
         entryPrice: snapshot.candle1.open,
@@ -65,8 +66,9 @@ export class StrategiesService extends CandleAbstract {
     }
   }
 
-  strategy_EngulfingRetested_Long(data: any, i: number, snapshot: any): any {
+  strategy_EngulfingRetested_Long(data: any): any {
     if (data.length >= 2) {
+      const i = data.length - 1;
       const candle0Size = Math.abs(this.close(data, i, 0) - this.open(data, i, 0));
       const candle1Size = Math.abs(this.close(data, i, 1) - this.open(data, i, 1));
       const isHigherHigh = this.high(data, i, 1) < this.high(data, i, 0); // anti gap
@@ -74,7 +76,7 @@ export class StrategiesService extends CandleAbstract {
       //const isLongEnough1 = (candle1Size / atr[i]) > 0.1;
       const setup = !this.isUp(data, i, 1) && this.isUp(data, i, 0) && (candle0Size >= candle1Size * 3) && isHigherHigh;
 
-      if (setup && (snapshot === undefined || (i !== snapshot.time))) {
+      if (setup) {
         return {
           time: i,
           canceled: false,
@@ -86,8 +88,9 @@ export class StrategiesService extends CandleAbstract {
   }
 
 
-  strategy_EngulfingRetested_Short(data: any, i: number, snapshot: any): any {
+  strategy_EngulfingRetested_Short(data: any): any {
     if (data.length >= 2) {
+      const i = data.length - 1;
       const candle0Size = Math.abs(this.close(data, i, 0) - this.open(data, i, 0));
       const candle1Size = Math.abs(this.close(data, i, 1) - this.open(data, i, 1));
       const isLowerLow = this.low(data, i, 1) > this.low(data, i, 0); // anti gap
@@ -95,7 +98,7 @@ export class StrategiesService extends CandleAbstract {
       //const isLongEnough1 = (candle1Size / atr[i]) > 0.1;
       const setup = this.isUp(data, i, 1) && !this.isUp(data, i, 0) && (candle0Size >= candle1Size * 3) && isLowerLow;
 
-      if (setup && (snapshot === undefined || (i !== snapshot.time))) {
+      if (setup) {
         return {
           time: i,
           canceled: false,
@@ -106,8 +109,8 @@ export class StrategiesService extends CandleAbstract {
     }
   }
 
-  trigger_EngulfingRetested_Short(snapshot: any, currentCandle: any): any {
-    if (snapshot && !snapshot.canceled && currentCandle.close >= snapshot.candle1.open) {
+  trigger_EngulfingRetested_Short(snapshot: any, price: number): any {
+    if (snapshot && !snapshot.canceled && price >= snapshot.candle1.open) {
       return {
         stopLoss: snapshot.candle1.high,
         entryPrice: snapshot.candle1.open,

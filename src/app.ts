@@ -7,7 +7,10 @@
 import { CandleAbstract } from './abstract/candleAbstract';
 import { StrategiesService } from './services/strategies-service';
 import { UtilsService } from './services/utils-service';
+import { Config } from './config';
 import ig from 'node-ig-api';
+import firebase from 'firebase';
+
 
 // VARIABLES
 let allData = [];
@@ -16,13 +19,6 @@ let loseTrades = [];
 let allTrades = [];
 
 const timeFrameArray = [1, 2, 5, 15, 45, 60];
-/* const items = [
-  'CHART:CS.D.EURGBP.CFD.IP:1MINUTE', 'CHART:CS.D.BITCOIN.CFD.IP:1MINUTE', 'CHART:CS.D.EURUSD.CFD.IP:1MINUTE', 'CHART:CS.D.GBPUSD.CFD.IP:1MINUTE',
-  'CHART:CS.D.AUDUSD.CFD.IP:1MINUTE', 'CHART:CS.D.EURJPY.CFD.IP:1MINUTE', 'CHART:CS.D.USDCAD.CFD.IP:1MINUTE', 'CHART:CS.D.USDCHF.CFD.IP:1MINUTE',
-  'CHART:CS.D.EURCHF.CFD.IP:1MINUTE', 'CHART:CS.D.GBPJPY.CFD.IP:1MINUTE', 'CHART:CS.D.EURCAD.CFD.IP:1MINUTE', 'CHART:CS.D.CADJPY.CFD.IP:1MINUTE',
-  'CHART:CS.D.GBPCHF.CFD.IP:1MINUTE', 'CHART:CS.D.CHFJPY.CFD.IP:1MINUTE', 'CHART:CS.D.GBPCAD.CFD.IP:1MINUTE', 'CHART:CS.D.CADCHF.CFD.IP:1MINUTE',
-  'CHART:CS.D.EURAUD.CFD.IP:1MINUTE', 'CHART:CS.D.AUDJPY.CFD.IP:1MINUTE', 'CHART:CS.D.AUDCAD.CFD.IP:1MINUTE', 'CHART:CS.D.AUDCHF.CFD.IP:1MINUTE',
-  'CHART:CS.D.NZDUSD.CFD.IP:1MINUTE', 'CHART:CS.D.GBPNZD.CFD.IP:1MINUTE', 'CHART:CS.D.GBPAUD.CFD.IP:1MINUTE', 'CHART:CS.D.AUDNZD.CFD.IP:1MINUTE']; */
 const items = [
   'MARKET:CS.D.EURGBP.CFD.IP', 'MARKET:CS.D.BITCOIN.CFD.IP', 'MARKET:CS.D.EURUSD.CFD.IP', 'MARKET:CS.D.GBPUSD.CFD.IP',
   'MARKET:CS.D.AUDUSD.CFD.IP', 'MARKET:CS.D.EURJPY.CFD.IP', 'MARKET:CS.D.USDCAD.CFD.IP', 'MARKET:CS.D.USDCHF.CFD.IP',
@@ -33,51 +29,12 @@ const items = [
 //const items = ['MARKET:CS.D.EURGBP.CFD.IP', 'MARKET:CS.D.GBPUSD.CFD.IP'];
 
 class App extends CandleAbstract {
-  constructor(private utils: UtilsService, private stratService: StrategiesService) {
+  constructor(private utils: UtilsService, private stratService: StrategiesService, private config: Config) {
     super();
-    allData = this.utils.dataArrayBuilderTest(items, allData, timeFrameArray);
-    //timeProcessed = this.utils.timeProcessedArrayBuilder(itemsTest, timeProcessed, timeFrameArray);
-    //allData = this.utils.dataArrayBuilder(items, allData);
-    //this.init();
-    this.test();
-  }
-
-
-  async test(): Promise<void> {
-    try {
-      await ig.login(true);
-      ig.connectToLightstreamer();
-      ig.subscribeToLightstreamer('MERGE', items, ['BID', 'OFFER'], 3);
-      ig.lsEmitter.on('update', (streamData: any) => {
-        //const minuteTimestamp = Math.trunc((Date.now() / 60000));
-        const ticker = this.utils.getTicker(streamData[1]);
-        const price = this.utils.round(parseFloat(streamData[2]) + (parseFloat(streamData[3]) - parseFloat(streamData[2])) / 2, 5);
-
-        this.CandlestickBuilder(timeFrameArray, ticker, price, streamData[0]);
-        const currentCandle = {
-          date: streamData[0],
-          close: price
-        }
-        for (const timeFrame of timeFrameArray) {
-          const tickerTf = ticker + '_' + timeFrame + 'MINUTE';
-          //console.log(tickerTf)
-
-          try {
-            this.runStrategyTest(currentCandle, tickerTf);
-          } catch (error) {
-            console.error(error);
-          }
-
-
-
-        }
-
-
-
-      });
-    } catch (error) {
-      console.error(error);
-    }
+    firebase.initializeApp(config.firebaseConfig);
+    allData = this.utils.dataArrayBuilder(items, allData, timeFrameArray);
+    this.init();
+    const options = { timeStyle: 'long' };
   }
 
 
@@ -87,26 +44,40 @@ class App extends CandleAbstract {
   async init(): Promise<void> {
     try {
       await ig.login(true);
-      //await ig.logout();
-
       ig.connectToLightstreamer();
-      ig.subscribeToLightstreamer('MERGE', items, ['BID_OPEN', 'BID_HIGH', 'BID_LOW', 'BID_CLOSE', 'CONS_END', 'OFR_OPEN', 'OFR_HIGH', 'OFR_LOW', 'OFR_CLOSE',], 1);
+      ig.subscribeToLightstreamer('MERGE', items, ['BID', 'OFFER'], 3);
       ig.lsEmitter.on('update', (streamData: any) => {
-        const currentCandle = {
-          date: new Date(),
-          tickerTf: this.utils.getTickerTimeframe(streamData[1]),
-          open: this.utils.round(parseFloat(streamData[2]) + (parseFloat(streamData[7]) - parseFloat(streamData[2])) / 2, 5),
-          high: this.utils.round(parseFloat(streamData[3]) + (parseFloat(streamData[8]) - parseFloat(streamData[3])) / 2, 5),
-          low: this.utils.round(parseFloat(streamData[4]) + (parseFloat(streamData[9]) - parseFloat(streamData[4])) / 2, 5),
-          close: this.utils.round(parseFloat(streamData[5]) + (parseFloat(streamData[10]) - parseFloat(streamData[5])) / 2, 5)
-        };
+        const minuteTimestamp = Math.trunc((Date.now() / 60000));
+        const ticker = this.utils.getTicker(streamData[1]);
+        const price = this.utils.round(parseFloat(streamData[2]) + (parseFloat(streamData[3]) - parseFloat(streamData[2])) / 2, 5);
 
-        if (streamData[6] === '1') { // CONS_END
-          allData[currentCandle.tickerTf].ohlc.push(currentCandle);
-        }
+        for (const timeFrame of timeFrameArray) {
+          const tickerTf = ticker + '_' + timeFrame + 'MINUTE';
 
-        if (allData[currentCandle.tickerTf].ohlc.length > 0) {
-          //const res = this.runStrategy(currentCandle);
+          if (minuteTimestamp % timeFrame === 0 && !allData[tickerTf].timeProcessed.find((element: any) => element === minuteTimestamp)) {
+            allData[tickerTf].timeProcessed.push(minuteTimestamp);
+
+            if (allData[tickerTf].ohlc_tmp) {
+              const lastCandle = allData[tickerTf].ohlc_tmp;
+              lastCandle.close = price;
+              allData[tickerTf].ohlc.push(lastCandle);
+              this.findSetupOnClosedCandles(tickerTf);
+              //console.log('Candlestick |', lastCandle.date, tickerTf, lastCandle.open, lastCandle.high, lastCandle.low, lastCandle.close)
+            }
+            allData[tickerTf].ohlc_tmp = { date: streamData[0], open: price, high: price, low: price };
+          }
+
+          if (allData[tickerTf].ohlc_tmp) {
+            let currentCandlestick = allData[tickerTf].ohlc_tmp;
+            if (price > currentCandlestick.high) {
+              currentCandlestick.high = price;
+            }
+            if (price < currentCandlestick.low) {
+              currentCandlestick.low = price;
+            }
+          }
+          this.entryExit(price, tickerTf, streamData[0]);
+
         }
       });
     } catch (error) {
@@ -115,209 +86,143 @@ class App extends CandleAbstract {
   }
 
 
-  /**
-   * Execution de la stratégie principale.
-   */
-  runStrategy(currentCandle: any) {
-    let rr: number;
-    const rrTarget = 2;
-    const tickerTf = currentCandle.tickerTf;
-    const data = allData[tickerTf].ohlc;
-    const i = allData[tickerTf].ohlc.length - 1;
-    const inLong = this.getDirection_Long(tickerTf);
-    const inShort = this.getDirection_Short(tickerTf);
-
-    if (inLong) {
-      rr = this.stratService.getFixedTakeProfitAndStopLoss('LONG', this.getTickerTfData(tickerTf), currentCandle);
-      this.updateResults('LONG', rr, tickerTf);
-    } else {
-      const isSetup = this.stratService.strategy_EngulfingRetested_Long(data, i, this.getSnapshot_Long(tickerTf));
-      if (isSetup) {
-        this.setSnapshot_Long(tickerTf, isSetup);
-      }
-
-      const res = this.stratService.trigger_EngulfingRetested_Long(this.getSnapshot_Long(tickerTf), currentCandle);
-      if (res) {
-        this.setDirection_Long(tickerTf, true);
-        this.setTriggerCanceled_Long(tickerTf, true);
-        this.setEntryPrice_Long(tickerTf, this.utils.round(res.entryPrice, 5));
-        this.setStopLoss_Long(tickerTf, this.utils.round(res.stopLoss, 5));
-        this.setTakeProfit_Long(tickerTf, this.utils.round(res.entryPrice + (res.entryPrice - res.stopLoss) * rrTarget, 5));
-
-        if (this.logEnable) {
-          console.log('--------');
-          console.log('Bullish Engulfing', data[this.getSnapshot_Long(tickerTf).time].date);
-          console.log('Long', tickerTf, currentCandle.date);
-          console.log('entryPrice', this.getEntryPrice_Long(tickerTf));
-          console.log('stopLoss', this.getStopLoss_Long(tickerTf));
-          console.log('takeProfit', this.getTakeProfit_Long(tickerTf));
-        }
-      }
-    }
-
-    if (inShort) {
-      rr = this.stratService.getFixedTakeProfitAndStopLoss('SHORT', this.getTickerTfData(tickerTf), currentCandle);
-      this.updateResults('SHORT', rr, tickerTf);
-    } else {
-      const isSetup = this.stratService.strategy_EngulfingRetested_Short(data, i, this.getSnapshot_Short(tickerTf));
-      if (isSetup) {
-        this.setSnapshot_Short(tickerTf, isSetup);
-      }
-
-      const res = this.stratService.trigger_EngulfingRetested_Short(this.getSnapshot_Short(tickerTf), currentCandle);
-      if (res) {
-        this.setDirection_Short(tickerTf, true);
-        this.setTriggerCanceled_Short(tickerTf, true);
-        this.setEntryPrice_Short(tickerTf, this.utils.round(res.entryPrice, 5));
-        this.setStopLoss_Short(tickerTf, this.utils.round(res.stopLoss, 5));
-        this.setTakeProfit_Short(tickerTf, this.utils.round(res.entryPrice + (res.entryPrice - res.stopLoss) * rrTarget, 5));
-
-        if (this.logEnable) {
-          console.log('--------');
-          console.log('Bearish Engulfing', data[this.getSnapshot_Short(tickerTf).time].date);
-          console.log('Short', tickerTf, currentCandle.date);
-          console.log('entryPrice', this.getEntryPrice_Short(tickerTf));
-          console.log('stopLoss', this.getStopLoss_Short(tickerTf));
-          console.log('takeProfit', this.getTakeProfit_Short(tickerTf));
-        }
-      }
-    }
-  }
-
 
   /**
    * Execution de la stratégie principale.
    */
-  runStrategyTest(currentCandle: any, tickerTf: string) {
+  entryExit(price: number, tickerTf: string, date: Date) {
     let rr: number;
     const rrTarget = 2;
     const data = allData[tickerTf].ohlc;
-    const i = allData[tickerTf].ohlc.length - 1;
     const inLong = this.getDirection_Long(tickerTf);
     const inShort = this.getDirection_Short(tickerTf);
 
-    if (inLong) {
-      rr = this.stratService.getFixedTakeProfitAndStopLoss('LONG', this.getTickerTfData(tickerTf), currentCandle);
-      this.updateResults('LONG', rr, tickerTf);
-    } else {
-      const isSetup = this.stratService.strategy_EngulfingRetested_Long(data, i, this.getSnapshot_Long(tickerTf));
-      if (isSetup) {
-        this.setSnapshot_Long(tickerTf, isSetup);
-      }
+    try {
+      if (inLong) {
+        rr = this.stratService.getFixedTakeProfitAndStopLoss('LONG', this.getTickerTfData(tickerTf), price);
+        this.updateResults('LONG', rr, tickerTf);
+      } else {
+        const res = this.stratService.trigger_EngulfingRetested_Long(this.getSnapshot_Long(tickerTf), price);
+        if (res) {
+          const date = this.utils.getDate();
+          this.setDirection_Long(tickerTf, true);
+          this.setSnapshotCanceled_Long(tickerTf, true);
+          this.setEntryTime_Long(tickerTf, date);
+          this.setEntryPrice_Long(tickerTf, this.utils.round(res.entryPrice, 5));
+          this.setStopLoss_Long(tickerTf, this.utils.round(res.stopLoss, 5));
+          this.setTakeProfit_Long(tickerTf, this.utils.round(res.entryPrice + (res.entryPrice - res.stopLoss) * rrTarget, 5));
 
-      const res = this.stratService.trigger_EngulfingRetested_Long(this.getSnapshot_Long(tickerTf), currentCandle);
-      if (res) {
-        this.setDirection_Long(tickerTf, true);
-        this.setTriggerCanceled_Long(tickerTf, true);
-        this.setEntryPrice_Long(tickerTf, this.utils.round(res.entryPrice, 5));
-        this.setStopLoss_Long(tickerTf, this.utils.round(res.stopLoss, 5));
-        this.setTakeProfit_Long(tickerTf, this.utils.round(res.entryPrice + (res.entryPrice - res.stopLoss) * rrTarget, 5));
-
-        if (this.logEnable) {
-          console.log('--------');
-          console.log('Bullish Engulfing', data[this.getSnapshot_Long(tickerTf).time].date);
-          console.log('Long', tickerTf, currentCandle.date);
-          console.log('entryPrice', this.getEntryPrice_Long(tickerTf));
-          console.log('stopLoss', this.getStopLoss_Long(tickerTf));
-          console.log('takeProfit', this.getTakeProfit_Long(tickerTf));
+          if (this.logEnable) {
+            console.log('--------');
+            console.log('Bullish Engulfing', data[this.getSnapshot_Long(tickerTf).time].date);
+            console.log('Long', tickerTf, date);
+            console.log('entryPrice', this.getEntryPrice_Long(tickerTf));
+            console.log('stopLoss', this.getStopLoss_Long(tickerTf));
+            console.log('takeProfit', this.getTakeProfit_Long(tickerTf));
+          }
         }
       }
-    }
 
-    if (inShort) {
-      rr = this.stratService.getFixedTakeProfitAndStopLoss('SHORT', this.getTickerTfData(tickerTf), currentCandle);
-      this.updateResults('SHORT', rr, tickerTf);
-    } else {
-      const isSetup = this.stratService.strategy_EngulfingRetested_Short(data, i, this.getSnapshot_Short(tickerTf));
-      if (isSetup) {
-        this.setSnapshot_Short(tickerTf, isSetup);
-      }
+      if (inShort) {
+        rr = this.stratService.getFixedTakeProfitAndStopLoss('SHORT', this.getTickerTfData(tickerTf), price);
+        this.updateResults('SHORT', rr, tickerTf);
+      } else {
+        const res = this.stratService.trigger_EngulfingRetested_Short(this.getSnapshot_Short(tickerTf), price);
+        if (res) {
+          const date = this.utils.getDate();
+          this.setDirection_Short(tickerTf, true);
+          this.setSnapshotCanceled_Short(tickerTf, true);
+          this.setEntryTime_Short(tickerTf, date);
+          this.setEntryPrice_Short(tickerTf, this.utils.round(res.entryPrice, 5));
+          this.setStopLoss_Short(tickerTf, this.utils.round(res.stopLoss, 5));
+          this.setTakeProfit_Short(tickerTf, this.utils.round(res.entryPrice + (res.entryPrice - res.stopLoss) * rrTarget, 5));
 
-      const res = this.stratService.trigger_EngulfingRetested_Short(this.getSnapshot_Short(tickerTf), currentCandle);
-      if (res) {
-        this.setDirection_Short(tickerTf, true);
-        this.setTriggerCanceled_Short(tickerTf, true);
-        this.setEntryPrice_Short(tickerTf, this.utils.round(res.entryPrice, 5));
-        this.setStopLoss_Short(tickerTf, this.utils.round(res.stopLoss, 5));
-        this.setTakeProfit_Short(tickerTf, this.utils.round(res.entryPrice + (res.entryPrice - res.stopLoss) * rrTarget, 5));
-
-        if (this.logEnable) {
-          console.log('--------');
-          console.log('Bearish Engulfing', data[this.getSnapshot_Short(tickerTf).time].date);
-          console.log('Short', tickerTf, currentCandle.date);
-          console.log('entryPrice', this.getEntryPrice_Short(tickerTf));
-          console.log('stopLoss', this.getStopLoss_Short(tickerTf));
-          console.log('takeProfit', this.getTakeProfit_Short(tickerTf));
+          if (this.logEnable) {
+            console.log('--------');
+            console.log('Bearish Engulfing', data[this.getSnapshot_Short(tickerTf).time].date);
+            console.log('Short', tickerTf, date);
+            console.log('entryPrice', this.getEntryPrice_Short(tickerTf));
+            console.log('stopLoss', this.getStopLoss_Short(tickerTf));
+            console.log('takeProfit', this.getTakeProfit_Short(tickerTf));
+          }
         }
       }
+    } catch (error) {
+      throw error;
     }
+
+
   }
 
   /**
    * Update trades's state, global R:R and log.
    */
   updateResults(direction: string, rr: number, tickerTf: any) {
-    if (rr !== undefined) {
-      if (direction === 'LONG') {
-        allData[tickerTf].inLong = false;
-      } else if (direction === 'SHORT') {
-        allData[tickerTf].inShort = false;
-      } else {
-        console.error('Long or short ?')
-      }
+    try {
+      if (rr !== undefined) {
+        allTrades.push(rr);
+        if (rr >= 0) {
+          winTrades.push(rr);
+        } else if (rr < 0) {
+          loseTrades.push(rr);
+        }
+        this.utils.insertTrade(this.getTickerTfData(tickerTf), tickerTf, winTrades, loseTrades, allTrades);
 
-      allTrades.push(rr);
-      if (rr >= 0) {
-        winTrades.push(rr);
-      } else if (rr < 0) {
-        loseTrades.push(rr);
+        if (direction === 'LONG') {
+          this.setDirection_Long(tickerTf, false);
+        } else if (direction === 'SHORT') {
+          this.setDirection_Short(tickerTf, false);
+        } else {
+          console.error('Long or short ?');
+        }
+
+        console.log('-------------------------');
+        console.log('---- UPDATED RESULTS ----');
+        console.log('-------------------------');
+        console.log('Last R:R', rr);
+        console.log(direction, tickerTf, this.utils.getDate());
+        console.log('Trades : Gagnes / Perdus / Total', winTrades.length, loseTrades.length, winTrades.length + loseTrades.length);
+        console.log('Total R:R', this.utils.round(loseTrades.reduce((a, b) => a + b, 0) + winTrades.reduce((a, b) => a + b, 0), 2));
+        console.log('Avg R:R', this.utils.round(allTrades.reduce((a, b) => a + b, 0) / allTrades.length, 2));
+        console.log('Winrate ' + this.utils.round((winTrades.length / (loseTrades.length + winTrades.length)) * 100, 2) + '%');
       }
-      console.log('-------------------------');
-      console.log('---- UPDATED RESULTS ----');
-      console.log('-------------------------');
-      console.log('Last R:R', rr);
-      console.log(direction, tickerTf, new Date());
-      console.log('Trades : Gagnes / Perdus / Total', winTrades.length, loseTrades.length, winTrades.length + loseTrades.length);
-      console.log('Total R:R', this.utils.round(loseTrades.reduce((a, b) => a + b, 0) + winTrades.reduce((a, b) => a + b, 0), 2));
-      console.log('Avg R:R', this.utils.round(allTrades.reduce((a, b) => a + b, 0) / allTrades.length, 2));
-      console.log('Winrate ' + this.utils.round((winTrades.length / (loseTrades.length + winTrades.length)) * 100, 2) + '%');
+    } catch (error) {
+      throw error;
     }
   }
 
 
+  /**
+   * Recherche de setup sur les candles closes et les sauvegarde dans AllData
+   */
+  findSetupOnClosedCandles(tickerTf: string) {
+    try {
+      const data = allData[tickerTf].ohlc;
+      const inLong = this.getDirection_Long(tickerTf);
+      const inShort = this.getDirection_Short(tickerTf);
 
-  CandlestickBuilder(timeFrameArray: any, ticker: string, price: number, date: Date) {
-    const minuteTimestamp = Math.trunc((Date.now() / 60000));
-
-    for (const timeFrame of timeFrameArray) {
-      const tickerTf = ticker + '_' + timeFrame + 'MINUTE';
-
-      if (minuteTimestamp % timeFrame === 0 && !allData[tickerTf].timeProcessed.find((element: any) => element === minuteTimestamp)) {
-        allData[tickerTf].timeProcessed.push(minuteTimestamp);
-
-        if (allData[tickerTf].ohlc_tmp) {
-          const lastCandle = allData[tickerTf].ohlc_tmp;
-          lastCandle.close = price;
-          allData[tickerTf].ohlc.push(lastCandle);
-          // Ici recherche de setup par rapport aux candles deja closes
-          //console.log('Candlestick |', lastCandle.date, tickerTf, lastCandle.open, lastCandle.high, lastCandle.low, lastCandle.close)
-        }
-        allData[tickerTf].ohlc_tmp = { date: date, open: price, high: price, low: price };
-      }
-
-      if (allData[tickerTf].ohlc_tmp) {
-        let currentCandlestick = allData[tickerTf].ohlc_tmp;
-        if (price > currentCandlestick.high) {
-          currentCandlestick.high = price;
-        }
-        if (price < currentCandlestick.low) {
-          currentCandlestick.low = price;
+      if (!inLong) {
+        const isLongSetup = this.stratService.strategy_EngulfingRetested_Long(data);
+        if (isLongSetup) {
+          this.setSnapshot_Long(tickerTf, isLongSetup);
         }
       }
+      if (!inShort) {
+        const isShortSetup = this.stratService.strategy_EngulfingRetested_Short(data);
+        if (isShortSetup) {
+          this.setSnapshot_Short(tickerTf, isShortSetup);
+        }
+      }
+    } catch (error) {
+      console.error(error);
+      this.utils.stopProcess();
     }
   }
 
 
+  /**
+   * GETTER / SETTER
+   */
   getTickerTfData(tickerTf: any) {
     return allData[tickerTf];
   }
@@ -337,10 +242,13 @@ class App extends CandleAbstract {
     return allData[tickerTf].snapshot_Long;
   }
 
+  setEntryTime_Long(tickerTf: any, value: any) {
+    allData[tickerTf].entryTime_Long = value;
+  }
   setSnapshot_Long(tickerTf: any, value: any) {
     allData[tickerTf].snapshot_Long = value;
   }
-  setTriggerCanceled_Long(tickerTf: any, value: boolean) {
+  setSnapshotCanceled_Long(tickerTf: any, value: boolean) {
     allData[tickerTf].snapshot_Long.canceled = value;
   }
   setDirection_Long(tickerTf: any, value: boolean) {
@@ -355,9 +263,6 @@ class App extends CandleAbstract {
   setTakeProfit_Long(tickerTf: any, value: number) {
     allData[tickerTf].takeProfit_Long = value;
   }
-
-
-
 
 
 
@@ -377,10 +282,13 @@ class App extends CandleAbstract {
     return allData[tickerTf].snapshot_Short;
   }
 
+  setEntryTime_Short(tickerTf: any, value: any) {
+    allData[tickerTf].entryTime_Short = value;
+  }
   setSnapshot_Short(tickerTf: any, value: any) {
     allData[tickerTf].snapshot_Short = value;
   }
-  setTriggerCanceled_Short(tickerTf: any, value: boolean) {
+  setSnapshotCanceled_Short(tickerTf: any, value: boolean) {
     allData[tickerTf].snapshot_Short.canceled = value;
   }
   setDirection_Short(tickerTf: any, value: boolean) {
@@ -398,4 +306,4 @@ class App extends CandleAbstract {
 }
 
 const utilsService = new UtilsService();
-new App(utilsService, new StrategiesService(utilsService));
+new App(utilsService, new StrategiesService(utilsService), new Config);

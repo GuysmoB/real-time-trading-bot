@@ -1088,9 +1088,7 @@ function subscribeToLightstreamer(subscriptionMode, items, fields, maxFreq) {
 
 			onItemUpdate: updateInfo => {
 				let data = [];
-				let date = new Date();
-				date.setHours(date.getHours() + 1);
-				data.push(date);
+				data.push(getDate());
 				data.push(updateInfo.getItemName());
 				updateInfo.forEachField((fieldName, fieldPos, value) => {
 					//console.log('Field: ' + fieldName + " Value: " + value);
@@ -1106,6 +1104,18 @@ function subscribeToLightstreamer(subscriptionMode, items, fields, maxFreq) {
 		lsClient.subscribe(subscription);
 
 	});
+}
+
+
+function getDate() {
+	let date = new Date();
+	const year = date.getFullYear();
+	const month = '0' + date.getMonth();
+	const day = '0' + date.getDay();
+	const hours = '0' + date.getHours();
+	const minutes = '0' + date.getMinutes();
+	const second = '0' + date.getSeconds();
+	return day + '/' + month.substr(-2) + '/' + year + ' ' + hours.substr(-2) + ':' + minutes.substr(-2) + ':' + second.substr(-2);
 }
 
 module.exports = {
