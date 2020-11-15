@@ -1110,12 +1110,12 @@ function subscribeToLightstreamer(subscriptionMode, items, fields, maxFreq) {
 function getDate() {
 	let date = new Date();
 	const year = date.getFullYear();
-	const month = '0' + date.getMonth();
-	const day = '0' + date.getDay();
+	const month = '0' + (date.getMonth() + 1);
+	const day = '0' + date.getDate();
 	const hours = '0' + date.getHours();
 	const minutes = '0' + date.getMinutes();
 	const second = '0' + date.getSeconds();
-	return day + '/' + month.substr(-2) + '/' + year + ' ' + hours.substr(-2) + ':' + minutes.substr(-2) + ':' + second.substr(-2);
+	return day.substr(-2) + '/' + month.substr(-2) + '/' + year + ' ' + hours.substr(-2) + ':' + minutes.substr(-2) + ':' + second.substr(-2);
 }
 
 module.exports = {

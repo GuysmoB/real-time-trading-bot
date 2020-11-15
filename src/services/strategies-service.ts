@@ -66,17 +66,17 @@ export class StrategiesService extends CandleAbstract {
     }
   }
 
-  strategy_EngulfingRetested_Long(data: any): any {
+  strategy_EngulfingRetested_Long(data: any, atr: any): any {
     if (data.length >= 2) {
       const i = data.length - 1;
       const candle0Size = Math.abs(this.close(data, i, 0) - this.open(data, i, 0));
       const candle1Size = Math.abs(this.close(data, i, 1) - this.open(data, i, 1));
       const isHigherHigh = this.high(data, i, 1) < this.high(data, i, 0); // anti gap
-      //const isLongEnough0 = (candle0Size / atr[i]) > 0.6;
-      //const isLongEnough1 = (candle1Size / atr[i]) > 0.1;
-      const setup = !this.isUp(data, i, 1) && this.isUp(data, i, 0) && (candle0Size >= candle1Size * 3) && isHigherHigh;
+      const isLongEnough1 = (candle1Size / atr[i]) > 0.1;
+      const setup = !this.isUp(data, i, 1) && isLongEnough1 && this.isUp(data, i, 0) && (candle0Size >= candle1Size * 3) && isHigherHigh;
 
       if (setup) {
+        console.log('candle size', candle1Size / atr[i], data[i].date);
         return {
           time: i,
           canceled: false,
@@ -88,17 +88,17 @@ export class StrategiesService extends CandleAbstract {
   }
 
 
-  strategy_EngulfingRetested_Short(data: any): any {
+  strategy_EngulfingRetested_Short(data: any, atr: any): any {
     if (data.length >= 2) {
       const i = data.length - 1;
       const candle0Size = Math.abs(this.close(data, i, 0) - this.open(data, i, 0));
       const candle1Size = Math.abs(this.close(data, i, 1) - this.open(data, i, 1));
       const isLowerLow = this.low(data, i, 1) > this.low(data, i, 0); // anti gap
-      //const isLongEnough0 = (candle0Size / atr[i]) > 0.6;
-      //const isLongEnough1 = (candle1Size / atr[i]) > 0.1;
-      const setup = this.isUp(data, i, 1) && !this.isUp(data, i, 0) && (candle0Size >= candle1Size * 3) && isLowerLow;
+      const isLongEnough1 = (candle1Size / atr[i]) > 0.1;
+      const setup = this.isUp(data, i, 1) && isLongEnough1 && !this.isUp(data, i, 0) && (candle0Size >= candle1Size * 3) && isLowerLow;
 
       if (setup) {
+        console.log('candle size', candle1Size / atr[i], data[i].date);
         return {
           time: i,
           canceled: false,

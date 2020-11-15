@@ -1,3 +1,4 @@
+import { IndicatorsService } from './services/indicators.service';
 // https://www.digitalocean.com/community/tutorials/setting-up-a-node-project-with-typescript
 // https://github.com/nikvdp/pidcrypt/issues/5#issuecomment-511383690
 // https://github.com/Microsoft/TypeScript/issues/17645#issuecomment-320556012
@@ -29,12 +30,12 @@ const items = [
 //const items = ['MARKET:CS.D.EURGBP.CFD.IP', 'MARKET:CS.D.GBPUSD.CFD.IP'];
 
 class App extends CandleAbstract {
-  constructor(private utils: UtilsService, private stratService: StrategiesService, private config: Config) {
+  constructor(private utils: UtilsService, private stratService: StrategiesService, private config: Config, private indicators: IndicatorsService) {
     super();
     firebase.initializeApp(config.firebaseConfig);
     allData = this.utils.dataArrayBuilder(items, allData, timeFrameArray);
+    console.log(utils.getDate())
     this.init();
-    const options = { timeStyle: 'long' };
   }
 
 
@@ -198,17 +199,18 @@ class App extends CandleAbstract {
   findSetupOnClosedCandles(tickerTf: string) {
     try {
       const data = allData[tickerTf].ohlc;
+      const atr = this.indicators.atr(data, 10);
       const inLong = this.getDirection_Long(tickerTf);
       const inShort = this.getDirection_Short(tickerTf);
 
       if (!inLong) {
-        const isLongSetup = this.stratService.strategy_EngulfingRetested_Long(data);
+        const isLongSetup = this.stratService.strategy_EngulfingRetested_Long(data, atr);
         if (isLongSetup) {
           this.setSnapshot_Long(tickerTf, isLongSetup);
         }
       }
       if (!inShort) {
-        const isShortSetup = this.stratService.strategy_EngulfingRetested_Short(data);
+        const isShortSetup = this.stratService.strategy_EngulfingRetested_Short(data, atr);
         if (isShortSetup) {
           this.setSnapshot_Short(tickerTf, isShortSetup);
         }
@@ -306,4 +308,4 @@ class App extends CandleAbstract {
 }
 
 const utilsService = new UtilsService();
-new App(utilsService, new StrategiesService(utilsService), new Config);
+new App(utilsService, new StrategiesService(utilsService), new Config, new IndicatorsService(utilsService));
