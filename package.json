@@ -22,6 +22,7 @@
     "firebase": "^8.0.2",
     "ig-api": "^0.15.0",
     "node-ig-api": "^2.0.4",
+    "node-telegram-bot-api": "^0.50.0",
     "yarn": "^1.22.10"
   },
   "devDependencies": {

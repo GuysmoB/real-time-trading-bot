@@ -1,23 +1,26 @@
-import { IndicatorsService } from './services/indicators.service';
 // https://www.digitalocean.com/community/tutorials/setting-up-a-node-project-with-typescript
 // https://github.com/nikvdp/pidcrypt/issues/5#issuecomment-511383690
 // https://github.com/Microsoft/TypeScript/issues/17645#issuecomment-320556012
 // https://github.com/gfiocco/node-ig-api#login
 // cp custom-ig-index.js node_modules/node-ig-api/index.js
 
+process.env.NTBA_FIX_319 = '1'; // disable Telegram error
+import { IndicatorsService } from './services/indicators.service';
 import { CandleAbstract } from './abstract/candleAbstract';
 import { StrategiesService } from './services/strategies-service';
 import { UtilsService } from './services/utils-service';
 import { Config } from './config';
 import ig from 'node-ig-api';
 import firebase from 'firebase';
-
+import TelegramBot from 'node-telegram-bot-api';
 
 // VARIABLES
 let allData = [];
 let winTrades = [];
 let loseTrades = [];
 let allTrades = [];
+let telegramBot: any;
+const toDataBase = false;
 
 const timeFrameArray = [1, 2, 5, 15, 45, 60];
 const items = [
@@ -29,12 +32,14 @@ const items = [
   'MARKET:CS.D.NZDUSD.CFD.IP', 'MARKET:CS.D.GBPNZD.CFD.IP', 'MARKET:CS.D.GBPAUD.CFD.IP', 'MARKET:CS.D.AUDNZD.CFD.IP'];
 //const items = ['MARKET:CS.D.EURGBP.CFD.IP', 'MARKET:CS.D.GBPUSD.CFD.IP'];
 
+
 class App extends CandleAbstract {
   constructor(private utils: UtilsService, private stratService: StrategiesService, private config: Config, private indicators: IndicatorsService) {
     super();
     firebase.initializeApp(config.firebaseConfig);
+    telegramBot = new TelegramBot(config.token, { polling: false });
+
     allData = this.utils.dataArrayBuilder(items, allData, timeFrameArray);
-    console.log(utils.getDate())
     this.init();
   }
 
@@ -63,7 +68,6 @@ class App extends CandleAbstract {
               lastCandle.close = price;
               allData[tickerTf].ohlc.push(lastCandle);
               this.findSetupOnClosedCandles(tickerTf);
-              //console.log('Candlestick |', lastCandle.date, tickerTf, lastCandle.open, lastCandle.high, lastCandle.low, lastCandle.close)
             }
             allData[tickerTf].ohlc_tmp = { date: streamData[0], open: price, high: price, low: price };
           }
@@ -167,7 +171,10 @@ class App extends CandleAbstract {
         } else if (rr < 0) {
           loseTrades.push(rr);
         }
-        this.utils.insertTrade(this.getTickerTfData(tickerTf), tickerTf, winTrades, loseTrades, allTrades);
+
+        if (toDataBase) {
+          this.utils.insertTrade(this.getTickerTfData(tickerTf), tickerTf, winTrades, loseTrades, allTrades);
+        }
 
         if (direction === 'LONG') {
           this.setDirection_Long(tickerTf, false);
@@ -215,6 +222,24 @@ class App extends CandleAbstract {
           this.setSnapshot_Short(tickerTf, isShortSetup);
         }
       }
+
+      const isLiquidityShort = this.stratService.checkLiquidity_Short(data, atr);
+      const isLiquidityLong = this.stratService.checkLiquidity_Long(data, atr);
+      if (isLiquidityLong) {
+        this.setLiquidity_Long(tickerTf, isLiquidityLong);
+      }
+      if (isLiquidityShort) {
+        this.setLiquidity_Short(tickerTf, isLiquidityShort);
+      }
+
+      const isLiquidityShortSetup = this.stratService.strategy_LiquidityBreakout_Short(data, this.getLiquidity_Short(tickerTf));
+      const isLiquidityLongSetup = this.stratService.strategy_LiquidityBreakout_Long(data, this.getLiquidity_Long(tickerTf));
+      if (isLiquidityLongSetup) {
+        this.utils.sendTelegramMsg(telegramBot, this.config.chatId, tickerTf + ' | Bullish liquidity setup');
+      }
+      if (isLiquidityShortSetup) {
+        this.utils.sendTelegramMsg(telegramBot, this.config.chatId, tickerTf + ' | Bearish liquidity setup');
+      }
     } catch (error) {
       console.error(error);
       this.utils.stopProcess();
@@ -225,6 +250,9 @@ class App extends CandleAbstract {
   /**
    * GETTER / SETTER
    */
+  getLiquidity_Long(tickerTf: any) {
+    return allData[tickerTf].liquidity_Long;
+  }
   getTickerTfData(tickerTf: any) {
     return allData[tickerTf];
   }
@@ -244,6 +272,9 @@ class App extends CandleAbstract {
     return allData[tickerTf].snapshot_Long;
   }
 
+  setLiquidity_Long(tickerTf: any, value: any) {
+    allData[tickerTf].liquidity_Long = value;
+  }
   setEntryTime_Long(tickerTf: any, value: any) {
     allData[tickerTf].entryTime_Long = value;
   }
@@ -267,7 +298,9 @@ class App extends CandleAbstract {
   }
 
 
-
+  getLiquidity_Short(tickerTf: any) {
+    return allData[tickerTf].liquidity_Short;
+  }
   getDirection_Short(tickerTf: any) {
     return allData[tickerTf].inShort;
   }
@@ -284,6 +317,9 @@ class App extends CandleAbstract {
     return allData[tickerTf].snapshot_Short;
   }
 
+  setLiquidity_Short(tickerTf: any, value: any) {
+    allData[tickerTf].liquidity_Short = value;
+  }
   setEntryTime_Short(tickerTf: any, value: any) {
     allData[tickerTf].entryTime_Short = value;
   }

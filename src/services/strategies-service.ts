@@ -73,10 +73,10 @@ export class StrategiesService extends CandleAbstract {
       const candle1Size = Math.abs(this.close(data, i, 1) - this.open(data, i, 1));
       const isHigherHigh = this.high(data, i, 1) < this.high(data, i, 0); // anti gap
       const isLongEnough1 = (candle1Size / atr[i]) > 0.1;
-      const setup = !this.isUp(data, i, 1) && isLongEnough1 && this.isUp(data, i, 0) && (candle0Size >= candle1Size * 3) && isHigherHigh;
+      const setup = !this.isUp(data, i, 1) /*&& isLongEnough1 */ && this.isUp(data, i, 0) && (candle0Size >= candle1Size * 3) && isHigherHigh;
 
       if (setup) {
-        console.log('candle size', candle1Size / atr[i], data[i].date);
+        //console.log('candle size', candle1Size / atr[i], data[i].date);
         return {
           time: i,
           canceled: false,
@@ -95,10 +95,10 @@ export class StrategiesService extends CandleAbstract {
       const candle1Size = Math.abs(this.close(data, i, 1) - this.open(data, i, 1));
       const isLowerLow = this.low(data, i, 1) > this.low(data, i, 0); // anti gap
       const isLongEnough1 = (candle1Size / atr[i]) > 0.1;
-      const setup = this.isUp(data, i, 1) && isLongEnough1 && !this.isUp(data, i, 0) && (candle0Size >= candle1Size * 3) && isLowerLow;
+      const setup = this.isUp(data, i, 1) /*&& isLongEnough1*/ && !this.isUp(data, i, 0) && (candle0Size >= candle1Size * 3) && isLowerLow;
 
       if (setup) {
-        console.log('candle size', candle1Size / atr[i], data[i].date);
+        //console.log('candle size', candle1Size / atr[i], data[i].date);
         return {
           time: i,
           canceled: false,
@@ -119,7 +119,99 @@ export class StrategiesService extends CandleAbstract {
   }
 
 
+  checkLiquidity_Long(data: any, atr: any): any {
+    let lastLow: number;
+    let brokenLows = 0;
+    const lookback = 10;
 
+    if (data.length >= lookback + 1) {
+      const i = data.length - 1;
+      const $swingHigh = this.utils.highest(data, i - 1, 'high', lookback);
+      const $swingLow = this.utils.lowest(data, i - 1, 'low', lookback);
+      const rangeHigh = this.utils.round(this.low(data, i, 0) + atr[i] * 2.5, 5);
+      const rangeLow = this.low(data, i, 0);
+
+      for (let k = (i - 1); k >= (i - lookback); k--) {
+        const candle = data[k];
+        if (brokenLows === 0) {
+          lastLow = candle.low;
+        }
+
+        if (candle.low < this.low(data, i, 0)) {
+          return undefined;
+        } else if (candle.low <= rangeHigh && candle.low >= rangeLow && candle.low <= lastLow) {
+          brokenLows++;
+          lastLow = candle.low;
+        }
+      }
+
+      if (brokenLows >= 1) {
+        console.log('Bullish liquidity found !', data[i].date, brokenLows, rangeHigh, rangeLow);
+        return {
+          time: i,
+          swingHigh: $swingHigh,
+          swingLow: $swingLow
+        };
+      }
+    }
+  }
+
+
+  checkLiquidity_Short(data: any, atr: any): any {
+    let lastHigh: number;
+    let brokenHighs = 0;
+    const lookback = 10;
+
+    if (data.length >= lookback + 1) {
+      const i = data.length - 1;
+      const $swingHigh = this.utils.highest(data, i - 1, 'high', lookback);
+      const $swingLow = this.utils.lowest(data, i - 1, 'low', lookback);
+      const rangeHigh = this.high(data, i, 0);
+      const rangeLow = this.utils.round(this.high(data, i, 0) - atr[i] * 2.5, 5);
+
+      for (let k = (i - 1); k >= (i - lookback); k--) {
+        const candle = data[k];
+        if (brokenHighs === 0) {
+          lastHigh = candle.high;
+        }
+
+        if (candle.high > this.high(data, i, 0)) {
+          return undefined;
+        } else if (candle.high <= rangeHigh && candle.high >= rangeLow && candle.high >= lastHigh) {
+          brokenHighs++;
+          lastHigh = candle.high;
+        }
+      }
+
+      if (brokenHighs >= 1) {
+        console.log('Bearish liquidity found !', data[i].date, brokenHighs, rangeHigh, rangeLow);
+        return {
+          time: i,
+          swingHigh: $swingHigh,
+          swingLow: $swingLow
+        };
+      }
+    }
+  }
+
+  /**
+   * Identifier une prise de liquidite, le garder en mémoire. Attendre un break
+   */
+  strategy_LiquidityBreakout_Long(data: any, liquidity: any): boolean {
+    if (data.length >= 1 && liquidity) {
+      const i = data.length - 1;
+      const timeToBreak = (i - liquidity.time);
+      return liquidity && this.high(data, i, 0) > liquidity.swingHigh && this.isUp(data, i, 0) && timeToBreak > 0 && timeToBreak <= 2;
+    }
+  }
+
+  strategy_LiquidityBreakout_Short(data: any, liquidity: any): boolean {
+    if (data.length >= 1 && liquidity) {
+      const i = data.length - 1;
+      const timeToBreak = (i - liquidity.time);
+      return liquidity && this.low(data, i, 0) < liquidity.swingLow && !this.isUp(data, i, 0) && timeToBreak > 0 && timeToBreak <= 2;
+    }
+  }
 
 }
 
