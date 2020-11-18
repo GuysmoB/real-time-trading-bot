@@ -19,6 +19,7 @@
   },
   "homepage": "https://github.com/GuysmoB/real-time-trading-bot#readme",
   "dependencies": {
+    "file-system": "^2.2.2",
     "firebase": "^8.0.2",
     "ig-api": "^0.15.0",
     "node-ig-api": "^2.0.4",

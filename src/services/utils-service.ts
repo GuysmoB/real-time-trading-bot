@@ -298,6 +298,26 @@ export class UtilsService {
     }
   }
 
+
+  /**
+   * Supprime le token si existant et refresh la connection toute les 10h.
+   */
+  async login(ig: any) {
+    const tokenContent = await promisify(fs.readFile)('node_modules\\node-ig-api\\tokens.json', 'UTF-8');
+    const tokenJson = JSON.parse(tokenContent);
+
+    if (tokenJson && tokenJson.tokens_exp > 0) {
+      //await ig.logout();
+      //console.log('logout');
+    }
+
+    await ig.login(true);
+    setInterval(async function () {
+      await ig.login(true);
+      console.log('Refresh token', this.getDate());
+    }, 1000 * 60 * 60 * 10)
+
+  }
 }
 
 export default new UtilsService();

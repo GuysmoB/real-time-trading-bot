@@ -121,7 +121,7 @@ export class StrategiesService extends CandleAbstract {
 
   checkLiquidity_Long(data: any, atr: any): any {
     let lastLow: number;
-    let brokenLows = 0;
+    let $brokenLows = 0;
     const lookback = 10;
 
     if (data.length >= lookback + 1) {
@@ -133,24 +133,24 @@ export class StrategiesService extends CandleAbstract {
 
       for (let k = (i - 1); k >= (i - lookback); k--) {
         const candle = data[k];
-        if (brokenLows === 0) {
+        if ($brokenLows === 0) {
           lastLow = candle.low;
         }
 
         if (candle.low < this.low(data, i, 0)) {
           return undefined;
         } else if (candle.low <= rangeHigh && candle.low >= rangeLow && candle.low <= lastLow) {
-          brokenLows++;
+          $brokenLows++;
           lastLow = candle.low;
         }
       }
 
-      if (brokenLows >= 1) {
-        console.log('Bullish liquidity found !', data[i].date, brokenLows, rangeHigh, rangeLow);
+      if ($brokenLows >= 2) {
         return {
           time: i,
           swingHigh: $swingHigh,
-          swingLow: $swingLow
+          swingLow: $swingLow,
+          brokenLows: $brokenLows
         };
       }
     }
@@ -159,7 +159,7 @@ export class StrategiesService extends CandleAbstract {
 
   checkLiquidity_Short(data: any, atr: any): any {
     let lastHigh: number;
-    let brokenHighs = 0;
+    let $brokenHighs = 0;
     const lookback = 10;
 
     if (data.length >= lookback + 1) {
@@ -171,24 +171,24 @@ export class StrategiesService extends CandleAbstract {
 
       for (let k = (i - 1); k >= (i - lookback); k--) {
         const candle = data[k];
-        if (brokenHighs === 0) {
+        if ($brokenHighs === 0) {
           lastHigh = candle.high;
         }
 
         if (candle.high > this.high(data, i, 0)) {
           return undefined;
         } else if (candle.high <= rangeHigh && candle.high >= rangeLow && candle.high >= lastHigh) {
-          brokenHighs++;
+          $brokenHighs++;
           lastHigh = candle.high;
         }
       }
 
-      if (brokenHighs >= 1) {
-        console.log('Bearish liquidity found !', data[i].date, brokenHighs, rangeHigh, rangeLow);
+      if ($brokenHighs >= 2) {
         return {
           time: i,
           swingHigh: $swingHigh,
-          swingLow: $swingLow
+          swingLow: $swingLow,
+          brokenHighs: $brokenHighs
         };
       }
     }

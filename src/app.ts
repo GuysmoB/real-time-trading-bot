@@ -29,7 +29,8 @@ const items = [
   'MARKET:CS.D.EURCHF.CFD.IP', 'MARKET:CS.D.GBPJPY.CFD.IP', 'MARKET:CS.D.EURCAD.CFD.IP', 'MARKET:CS.D.CADJPY.CFD.IP',
   'MARKET:CS.D.GBPCHF.CFD.IP', 'MARKET:CS.D.CHFJPY.CFD.IP', 'MARKET:CS.D.GBPCAD.CFD.IP', 'MARKET:CS.D.CADCHF.CFD.IP',
   'MARKET:CS.D.EURAUD.CFD.IP', 'MARKET:CS.D.AUDJPY.CFD.IP', 'MARKET:CS.D.AUDCAD.CFD.IP', 'MARKET:CS.D.AUDCHF.CFD.IP',
-  'MARKET:CS.D.NZDUSD.CFD.IP', 'MARKET:CS.D.GBPNZD.CFD.IP', 'MARKET:CS.D.GBPAUD.CFD.IP', 'MARKET:CS.D.AUDNZD.CFD.IP'];
+  'MARKET:CS.D.CFEGOLD.CFE.IP', 'MARKET:CS.D.CFDSILVER.CFM.IP', 'MARKET:MT.D.PL.FWM2.IP', 'MARKET:CC.D.LCO.UME.IP',
+  'MARKET:EN.D.RB.FWM2.IP', 'MARKET:EN.D.HO.FWM1.IP'];
 //const items = ['MARKET:CS.D.EURGBP.CFD.IP', 'MARKET:CS.D.GBPUSD.CFD.IP'];
 
 
@@ -49,7 +50,7 @@ class App extends CandleAbstract {
    */
   async init(): Promise<void> {
     try {
-      await ig.login(true);
+      await this.utils.login(ig)
       ig.connectToLightstreamer();
       ig.subscribeToLightstreamer('MERGE', items, ['BID', 'OFFER'], 3);
       ig.lsEmitter.on('update', (streamData: any) => {
@@ -210,7 +211,7 @@ class App extends CandleAbstract {
       const inLong = this.getDirection_Long(tickerTf);
       const inShort = this.getDirection_Short(tickerTf);
 
-      if (!inLong) {
+      /* if (!inLong) {
         const isLongSetup = this.stratService.strategy_EngulfingRetested_Long(data, atr);
         if (isLongSetup) {
           this.setSnapshot_Long(tickerTf, isLongSetup);
@@ -221,23 +222,27 @@ class App extends CandleAbstract {
         if (isShortSetup) {
           this.setSnapshot_Short(tickerTf, isShortSetup);
         }
-      }
+      } */
 
       const isLiquidityShort = this.stratService.checkLiquidity_Short(data, atr);
       const isLiquidityLong = this.stratService.checkLiquidity_Long(data, atr);
       if (isLiquidityLong) {
+        //console.log(tickerTf + ' | ' + this.utils.getDate() + ' | Bullish liquidity found !');
         this.setLiquidity_Long(tickerTf, isLiquidityLong);
       }
       if (isLiquidityShort) {
+        //console.log(tickerTf + ' | ' + this.utils.getDate() + ' | Bearish liquidity found !');
         this.setLiquidity_Short(tickerTf, isLiquidityShort);
       }
 
       const isLiquidityShortSetup = this.stratService.strategy_LiquidityBreakout_Short(data, this.getLiquidity_Short(tickerTf));
       const isLiquidityLongSetup = this.stratService.strategy_LiquidityBreakout_Long(data, this.getLiquidity_Long(tickerTf));
       if (isLiquidityLongSetup) {
+        this.setLiquidity_Long(tickerTf, undefined);
         this.utils.sendTelegramMsg(telegramBot, this.config.chatId, tickerTf + ' | Bullish liquidity setup');
       }
       if (isLiquidityShortSetup) {
+        this.setLiquidity_Short(tickerTf, undefined);
         this.utils.sendTelegramMsg(telegramBot, this.config.chatId, tickerTf + ' | Bearish liquidity setup');
       }
     } catch (error) {
