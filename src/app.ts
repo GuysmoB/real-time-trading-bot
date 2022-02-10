@@ -19,13 +19,17 @@ class App extends CandleAbstract {
   loseTrades = [];
   inLong = false;
   inShort = false;
-  looseInc = 0;
-  looseInc2 = 0;
-  payout: any;
+  allTickers = ['BTC', 'ETH', 'BNB'];
+  allTf = ['1', '5'];
+  urlPath: string;
+  urlBase = 'https://api.staging.woo.org/';
   countdown: any;
+  ticker: string;
+  tf: string;
   ohlc = [];
   haOhlc = [];
   telegramBot: any;
+  databasePath: string;
   toDataBase = false;
   isCountDown55 = false;
   token = 'b15346f6544b4d289139b2feba668b20';
@@ -35,33 +39,52 @@ class App extends CandleAbstract {
     super();
     firebase.initializeApp(config.firebaseConfig);
     this.telegramBot = new TelegramBot(config.token, { polling: false });
-    this.main();
+    this.ticker = process.argv.slice(2)[0];
+    this.tf = process.argv.slice(2)[1];
+    this.urlPath = 'https://' + this.ticker + '.history.hxro.io/' + this.tf + 'm';
+    this.databasePath = '/' + this.ticker + this.tf;
+    this.initApp();
+
+
+    let lastTime: number;
+    setInterval(async () => {
+      let second = new Date().getSeconds();
+      let minute = new Date().getMinutes();
+
+      if (this.tf == '1') {
+        if (second == 55 && second != lastTime) {
+          this.main();
+        }
+      } else if (this.tf == '5') {
+        if (second == 55 && (minute.toString().substr(-1) == '4' || minute.toString().substr(-1) == '9') && second != lastTime) {
+          this.main();
+        }
+      }
+
+      lastTime = second;
+    }, 500);
   }
 
 
+  /**
+   * Initialisation de l'app
+   */
+  async initApp() {
+    console.log('App started |', this.utils.getDate());
+    process.title = 'main';
+    this.utils.checkArg(this.ticker, this.tf, this.allTickers, this.allTf);
+    this.toDataBase ? this.utils.initFirebase(this.databasePath) : '';
+    this.telegramBot = new TelegramBot(this.config.token, { polling: false });
+  }
 
   /**
    * Gère la création des candles et de la logique principale..
    */
   async main() {
-    const _this = this;
-
-    setInterval(async () => {
-      this.countdown = new Date().getSeconds();
-      if (this.countdown == 10) {
-        (this.isCountDown55) ? this.isCountDown55 = false : '';
-      }
-
-      if (this.countdown == 55 && !this.isCountDown55) {
-        this.isCountDown55 = true; // Doit être la 1er ligne
-        this.payout = await _this.apiService.getActualPayout(this.token);
-        const allData = await this.apiService.getDataFromApi();
-        this.ohlc = allData.data.slice();
-        this.haOhlc = this.utils.setHeikenAshiData(this.ohlc);
-        this.bullOrBear();
-      }
-    }, 500);
-    console.log('Timer is started ...');
+    const allData = await this.apiService.getDataFromApi(this.urlPath);
+    this.ohlc = allData.data.slice();
+    this.haOhlc = this.utils.setHeikenAshiData(this.ohlc);
+    this.bullOrBear();
   }
 
 
@@ -71,37 +94,28 @@ class App extends CandleAbstract {
    */
   async getResult(direction: string) {
     try {
-      const allData = await this.apiService.getDataFromApi();
+      const allData = await this.apiService.getDataFromApi(this.urlPath);
       this.ohlc = allData.data.slice();
       const i = this.ohlc.length - 2; // candle avant la candle en cour
       this.haOhlc = this.utils.setHeikenAshiData(this.ohlc);
 
       if (direction == 'long') {
         if (this.isUp(this.ohlc, i, 0)) {
-          this.winTrades.push(this.payout.moonPayout);
-          this.toDataBase ? this.utils.updateFirebaseResults(this.payout.moonPayout) : '';
-          console.log('++ | Payout ', this.payout.moonPayout, '| Total ', this.utils.round(this.utils.arraySum(this.winTrades.concat(this.loseTrades)), 2), '|', this.utils.getDate(this.ohlc[i].time));
-          this.looseInc = 0;
+          this.toDataBase ? this.utils.updateFirebaseResults(1, this.databasePath) : '';
         } else {
           this.loseTrades.push(-1);
-          this.toDataBase ? this.utils.updateFirebaseResults(-1) : '';
-          console.log('-- | Payout ', this.payout.moonPayout, '| Total ', this.utils.round(this.utils.arraySum(this.winTrades.concat(this.loseTrades)), 2), '|', this.utils.getDate(this.ohlc[i].time));
-          this.looseInc++;
+          this.toDataBase ? this.utils.updateFirebaseResults(-1, this.databasePath) : '';
+          console.log('-- | Total ', this.utils.round(this.utils.arraySum(this.winTrades.concat(this.loseTrades)), 2), '|', this.utils.getDate(this.ohlc[i].time));
         }
         this.sendTelegramMsg(this.telegramBot, this.config.chatId, this.formatTelegramMsg());
       }
 
       else if (direction == 'short') {
         if (!this.isUp(this.ohlc, i, 0)) {
-          this.winTrades.push(this.payout.rektPayout);
-          this.toDataBase ? this.utils.updateFirebaseResults(this.payout.rektPayout) : '';
-          console.log('++ | Payout ', this.payout.rektPayout, '| Total ', this.utils.round(this.utils.arraySum(this.winTrades.concat(this.loseTrades)), 2), '|', this.utils.getDate(this.ohlc[i].time));
-          this.looseInc2 = 0;
+          console.log('++ | Total ', this.utils.round(this.utils.arraySum(this.winTrades.concat(this.loseTrades)), 2), '|', this.utils.getDate(this.ohlc[i].time));
         } else {
           this.loseTrades.push(-1);
-          this.toDataBase ? this.utils.updateFirebaseResults(-1) : '';
-          console.log('-- | Payout ', this.payout.rektPayout, '| Total ', this.utils.round(this.utils.arraySum(this.winTrades.concat(this.loseTrades)), 2), '|', this.utils.getDate(this.ohlc[i].time));
-          this.looseInc2++;
+          console.log('-- | Total ', this.utils.round(this.utils.arraySum(this.winTrades.concat(this.loseTrades)), 2), '|', this.utils.getDate(this.ohlc[i].time));
         }
         this.sendTelegramMsg(this.telegramBot, this.config.chatId, this.formatTelegramMsg());
       }
@@ -131,7 +145,6 @@ class App extends CandleAbstract {
     if (this.inLong) {
       if (this.stopConditions(i)) {
         this.inLong = false;
-        this.looseInc = 0;
         console.log('Exit long setup', this.utils.getDate());
       } else {
         this.waitingNextCandle('long');
@@ -139,7 +152,6 @@ class App extends CandleAbstract {
     } else if (this.inShort) {
       if (this.stopConditions(i)) {
         this.inShort = false;
-        this.looseInc2 = 0;
         console.log('Exit short setup', this.utils.getDate());
       } else {
         this.waitingNextCandle('short');
@@ -177,8 +189,6 @@ class App extends CandleAbstract {
     return (
       (this.inLong && this.haOhlc[i].bear) ||
       (this.inShort && this.haOhlc[i].bull) ||
-      this.looseInc == 5 ||
-      this.looseInc2 == 5 ||
       Math.abs(this.high(this.ohlc, i, 0) - this.low(this.ohlc, i, 0)) > 80
     ) ? true : false;
   }

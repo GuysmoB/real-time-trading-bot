@@ -14,7 +14,23 @@ export class UtilsService {
     return gain - (gain * 0.03)
   }
 
+  /**
+  * Permet d'arrêter le processus.
+  */
+  stopProcess(msg: string) {
+    console.error(msg)
+    process.exit(1);
+  }
 
+
+  /**
+   * Check la validité des arguments passés à l'app.
+   */
+  checkArg(ticker: string, tf: string, allTicker: any, allTf: any) {
+    if (!allTicker.includes(ticker) || !allTf.includes(tf)) {
+      this.stopProcess('Argument error: ' + ticker + ' ' + tf);
+    }
+  }
 
   /**
  * Fait la somme des nombres d'un tableau
@@ -117,14 +133,6 @@ export class UtilsService {
 
 
   /**
-   * Permet d'arrêter le processus.
-   */
-  stopProcess() {
-    console.log("Process will be stopped !");
-    process.exit();
-  }
-
-  /**
    * Retourne la date avec décalage horaire.
    */
   getDate(ts?: any): any {
@@ -141,24 +149,26 @@ export class UtilsService {
 
 
   /**
-   * Insert chaque trade dans Firebase.
-   */
-  async updateFirebaseResults($rr: any) {
+    * Insert chaque trade dans Firebase.
+    */
+  async updateFirebaseResults($rr: any, databasePath: string) {
     try {
-      const res = await this.getFirebaseResults();
-      const $winTrades = ($rr > 0) ? res.winTrades + 1 : res.winTrades;
-      const $loseTrades = ($rr < 0) ? res.loseTrades + 1 : res.loseTrades;
-      const $winrate = this.round(($winTrades / ($loseTrades + $winTrades)) * 100, 2);
-      firebase.database().ref("/results").remove();
-      firebase.database().ref("/results").push({
-        winTrades: $winTrades,
-        loseTrades: $loseTrades,
-        totalTrades: res.totalTrades + 1,
-        totalRR: res.totalRR + $rr,
-        'winrate%': $winrate ? $winrate : 0,
-      });
+      const res = await this.getFirebaseResults(databasePath);
+      if (res) {
+        const $winTrades = ($rr > 0) ? res.winTrades + 1 : res.winTrades;
+        const $loseTrades = ($rr < 0) ? res.loseTrades + 1 : res.loseTrades;
+        const $winrate = this.round(($winTrades / ($loseTrades + $winTrades)) * 100, 2);
+        await firebase.database().ref(databasePath).remove();
+        await firebase.database().ref(databasePath).push({
+          winTrades: $winTrades,
+          loseTrades: $loseTrades,
+          totalTrades: res.totalTrades + 1,
+          totalRR: res.totalRR + $rr,
+          'winrate%': $winrate ? $winrate : 0,
+        });
+      }
     } catch (error) {
-      throw error;
+      throw new Error('Error updateFirebaseResults()' + error);
     }
   }
 
@@ -166,19 +176,37 @@ export class UtilsService {
   /**
    * Récupère les resultats depuis Firebase.
    */
-  async getFirebaseResults() {
+  async getFirebaseResults(databasePath: string) {
     try {
-      let snapshot = await firebase.database().ref('/results').once('value');
+      let snapshot = await firebase.database().ref(databasePath).once('value');
       if (snapshot.exists()) {
         const id = Object.keys(snapshot.val())[0];
         return snapshot.child(id).val();
-      } else {
-        throw new Error('Error from Firebase GET');
       }
     } catch (error) {
       console.error(error);
     }
-    return '';
+    return undefined;
+  }
+
+  /**
+   * Initialise Firebase si la rerf n'existe pas.
+   */
+  async initFirebase(databasePath: string) {
+    try {
+      const res = await this.getFirebaseResults(databasePath);
+      if (!res) {
+        await firebase.database().ref(databasePath).push({
+          winTrades: 0,
+          loseTrades: 0,
+          totalTrades: 0,
+          totalRR: 0,
+          'winrate%': 0,
+        });
+      }
+    } catch (error) {
+      throw new Error('Error initFirebase()' + error);
+    }
   }
 
 }
