@@ -22,7 +22,7 @@ let allTrades = [];
 let telegramBot: any;
 const toDataBase = false;
 
-const timeFrameArray = [1, 2, 5, 15, 45, 60];
+const timeFrameArray = [15, 30, 45, 60, 60*1.5, 60*2, 60*3, 60*4, 60*12, 60*24];
 const items = [
   'MARKET:CS.D.EURGBP.CFD.IP', 'MARKET:CS.D.BITCOIN.CFD.IP', 'MARKET:CS.D.EURUSD.CFD.IP', 'MARKET:CS.D.GBPUSD.CFD.IP',
   'MARKET:CS.D.AUDUSD.CFD.IP', 'MARKET:CS.D.EURJPY.CFD.IP', 'MARKET:CS.D.USDCAD.CFD.IP', 'MARKET:CS.D.USDCHF.CFD.IP',
@@ -211,7 +211,7 @@ class App extends CandleAbstract {
       const inLong = this.getDirection_Long(tickerTf);
       const inShort = this.getDirection_Short(tickerTf);
 
-      /* if (!inLong) {
+      if (!inLong) {
         const isLongSetup = this.stratService.strategy_EngulfingRetested_Long(data, atr);
         if (isLongSetup) {
           this.setSnapshot_Long(tickerTf, isLongSetup);
@@ -222,7 +222,7 @@ class App extends CandleAbstract {
         if (isShortSetup) {
           this.setSnapshot_Short(tickerTf, isShortSetup);
         }
-      } */
+      } 
 
       const isLiquidityShort = this.stratService.checkLiquidity_Short(data, atr);
       const isLiquidityLong = this.stratService.checkLiquidity_Long(data, atr);
