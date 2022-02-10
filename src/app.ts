@@ -1,352 +1,194 @@
+import { ApiService } from './services/api.service';
 // https://www.digitalocean.com/community/tutorials/setting-up-a-node-project-with-typescript
 // https://github.com/nikvdp/pidcrypt/issues/5#issuecomment-511383690
 // https://github.com/Microsoft/TypeScript/issues/17645#issuecomment-320556012
-// https://github.com/gfiocco/node-ig-api#login
-// cp custom-ig-index.js node_modules/node-ig-api/index.js
 
-process.env.NTBA_FIX_319 = '1'; // disable Telegram error
-import { IndicatorsService } from './services/indicators.service';
-import { CandleAbstract } from './abstract/candleAbstract';
-import { StrategiesService } from './services/strategies-service';
-import { UtilsService } from './services/utils-service';
-import { Config } from './config';
-import ig from 'node-ig-api';
-import firebase from 'firebase';
-import TelegramBot from 'node-telegram-bot-api';
-
-// VARIABLES
-let allData = [];
-let winTrades = [];
-let loseTrades = [];
-let allTrades = [];
-let telegramBot: any;
-const toDataBase = false;
-
-const timeFrameArray = [15, 30, 45, 60, 60*1.5, 60*2, 60*3, 60*4, 60*12, 60*24];
-const items = [
-  'MARKET:CS.D.EURGBP.CFD.IP', 'MARKET:CS.D.BITCOIN.CFD.IP', 'MARKET:CS.D.EURUSD.CFD.IP', 'MARKET:CS.D.GBPUSD.CFD.IP',
-  'MARKET:CS.D.AUDUSD.CFD.IP', 'MARKET:CS.D.EURJPY.CFD.IP', 'MARKET:CS.D.USDCAD.CFD.IP', 'MARKET:CS.D.USDCHF.CFD.IP',
-  'MARKET:CS.D.EURCHF.CFD.IP', 'MARKET:CS.D.GBPJPY.CFD.IP', 'MARKET:CS.D.EURCAD.CFD.IP', 'MARKET:CS.D.CADJPY.CFD.IP',
-  'MARKET:CS.D.GBPCHF.CFD.IP', 'MARKET:CS.D.CHFJPY.CFD.IP', 'MARKET:CS.D.GBPCAD.CFD.IP', 'MARKET:CS.D.CADCHF.CFD.IP',
-  'MARKET:CS.D.EURAUD.CFD.IP', 'MARKET:CS.D.AUDJPY.CFD.IP', 'MARKET:CS.D.AUDCAD.CFD.IP', 'MARKET:CS.D.AUDCHF.CFD.IP',
-  'MARKET:CS.D.CFEGOLD.CFE.IP', 'MARKET:CS.D.CFDSILVER.CFM.IP', 'MARKET:MT.D.PL.FWM2.IP', 'MARKET:CC.D.LCO.UME.IP',
-  'MARKET:EN.D.RB.FWM2.IP', 'MARKET:EN.D.HO.FWM1.IP'];
-//const items = ['MARKET:CS.D.EURGBP.CFD.IP', 'MARKET:CS.D.GBPUSD.CFD.IP'];
-
+process.env.NTBA_FIX_319 = "1"; // disable Telegram error
+import { IndicatorsService } from "./services/indicators.service";
+import { CandleAbstract } from "./abstract/candleAbstract";
+import { StrategiesService } from "./services/strategies-service";
+import { UtilsService } from "./services/utils-service";
+import { Config } from "./config";
+import firebase from "firebase";
+import TelegramBot from "node-telegram-bot-api";
+//import WebSocket from "ws";
 
 class App extends CandleAbstract {
-  constructor(private utils: UtilsService, private stratService: StrategiesService, private config: Config, private indicators: IndicatorsService) {
+
+  winTrades = [];
+  loseTrades = [];
+  inLong = false;
+  inShort = false;
+  looseInc = 0;
+  looseInc2 = 0;
+  payout: any;
+  countdown: any;
+  ohlc = [];
+  haOhlc = [];
+  telegramBot: any;
+  toDataBase = false;
+  isCountDown55 = false;
+  token = 'b15346f6544b4d289139b2feba668b20';
+
+  constructor(private utils: UtilsService, private stratService: StrategiesService, private config: Config,
+    private indicators: IndicatorsService, private apiService: ApiService) {
     super();
     firebase.initializeApp(config.firebaseConfig);
-    telegramBot = new TelegramBot(config.token, { polling: false });
-
-    allData = this.utils.dataArrayBuilder(items, allData, timeFrameArray);
-    this.init();
-  }
-
-
-  /**
-   * Point d'entrée.
-   */
-  async init(): Promise<void> {
-    try {
-      await this.utils.login(ig)
-      ig.connectToLightstreamer();
-      ig.subscribeToLightstreamer('MERGE', items, ['BID', 'OFFER'], 3);
-      ig.lsEmitter.on('update', (streamData: any) => {
-        const minuteTimestamp = Math.trunc((Date.now() / 60000));
-        const ticker = this.utils.getTicker(streamData[1]);
-        const price = this.utils.round(parseFloat(streamData[2]) + (parseFloat(streamData[3]) - parseFloat(streamData[2])) / 2, 5);
-
-        for (const timeFrame of timeFrameArray) {
-          const tickerTf = ticker + '_' + timeFrame + 'MINUTE';
-
-          if (minuteTimestamp % timeFrame === 0 && !allData[tickerTf].timeProcessed.find((element: any) => element === minuteTimestamp)) {
-            allData[tickerTf].timeProcessed.push(minuteTimestamp);
-
-            if (allData[tickerTf].ohlc_tmp) {
-              const lastCandle = allData[tickerTf].ohlc_tmp;
-              lastCandle.close = price;
-              allData[tickerTf].ohlc.push(lastCandle);
-              this.findSetupOnClosedCandles(tickerTf);
-            }
-            allData[tickerTf].ohlc_tmp = { date: streamData[0], open: price, high: price, low: price };
-          }
-
-          if (allData[tickerTf].ohlc_tmp) {
-            let currentCandlestick = allData[tickerTf].ohlc_tmp;
-            if (price > currentCandlestick.high) {
-              currentCandlestick.high = price;
-            }
-            if (price < currentCandlestick.low) {
-              currentCandlestick.low = price;
-            }
-          }
-          this.entryExit(price, tickerTf, streamData[0]);
-
-        }
-      });
-    } catch (error) {
-      console.error(error);
-    }
+    this.telegramBot = new TelegramBot(config.token, { polling: false });
+    this.main();
   }
 
 
 
   /**
-   * Execution de la stratégie principale.
+   * Gère la création des candles et de la logique principale..
    */
-  entryExit(price: number, tickerTf: string, date: Date) {
-    let rr: number;
-    const rrTarget = 2;
-    const data = allData[tickerTf].ohlc;
-    const inLong = this.getDirection_Long(tickerTf);
-    const inShort = this.getDirection_Short(tickerTf);
+  async main() {
+    const _this = this;
 
-    try {
-      if (inLong) {
-        rr = this.stratService.getFixedTakeProfitAndStopLoss('LONG', this.getTickerTfData(tickerTf), price);
-        this.updateResults('LONG', rr, tickerTf);
-      } else {
-        const res = this.stratService.trigger_EngulfingRetested_Long(this.getSnapshot_Long(tickerTf), price);
-        if (res) {
-          const date = this.utils.getDate();
-          this.setDirection_Long(tickerTf, true);
-          this.setSnapshotCanceled_Long(tickerTf, true);
-          this.setEntryTime_Long(tickerTf, date);
-          this.setEntryPrice_Long(tickerTf, this.utils.round(res.entryPrice, 5));
-          this.setStopLoss_Long(tickerTf, this.utils.round(res.stopLoss, 5));
-          this.setTakeProfit_Long(tickerTf, this.utils.round(res.entryPrice + (res.entryPrice - res.stopLoss) * rrTarget, 5));
-
-          if (this.logEnable) {
-            console.log('--------');
-            console.log('Bullish Engulfing', data[this.getSnapshot_Long(tickerTf).time].date);
-            console.log('Long', tickerTf, date);
-            console.log('entryPrice', this.getEntryPrice_Long(tickerTf));
-            console.log('stopLoss', this.getStopLoss_Long(tickerTf));
-            console.log('takeProfit', this.getTakeProfit_Long(tickerTf));
-          }
-        }
+    setInterval(async () => {
+      this.countdown = new Date().getSeconds();
+      if (this.countdown == 10) {
+        (this.isCountDown55) ? this.isCountDown55 = false : '';
       }
 
-      if (inShort) {
-        rr = this.stratService.getFixedTakeProfitAndStopLoss('SHORT', this.getTickerTfData(tickerTf), price);
-        this.updateResults('SHORT', rr, tickerTf);
-      } else {
-        const res = this.stratService.trigger_EngulfingRetested_Short(this.getSnapshot_Short(tickerTf), price);
-        if (res) {
-          const date = this.utils.getDate();
-          this.setDirection_Short(tickerTf, true);
-          this.setSnapshotCanceled_Short(tickerTf, true);
-          this.setEntryTime_Short(tickerTf, date);
-          this.setEntryPrice_Short(tickerTf, this.utils.round(res.entryPrice, 5));
-          this.setStopLoss_Short(tickerTf, this.utils.round(res.stopLoss, 5));
-          this.setTakeProfit_Short(tickerTf, this.utils.round(res.entryPrice + (res.entryPrice - res.stopLoss) * rrTarget, 5));
-
-          if (this.logEnable) {
-            console.log('--------');
-            console.log('Bearish Engulfing', data[this.getSnapshot_Short(tickerTf).time].date);
-            console.log('Short', tickerTf, date);
-            console.log('entryPrice', this.getEntryPrice_Short(tickerTf));
-            console.log('stopLoss', this.getStopLoss_Short(tickerTf));
-            console.log('takeProfit', this.getTakeProfit_Short(tickerTf));
-          }
-        }
+      if (this.countdown == 55 && !this.isCountDown55) {
+        this.isCountDown55 = true; // Doit être la 1er ligne
+        this.payout = await _this.apiService.getActualPayout(this.token);
+        const allData = await this.apiService.getDataFromApi();
+        this.ohlc = allData.data.slice();
+        this.haOhlc = this.utils.setHeikenAshiData(this.ohlc);
+        this.bullOrBear();
       }
-    } catch (error) {
-      throw error;
-    }
-
-
+    }, 500);
+    console.log('Timer is started ...');
   }
 
+
+
   /**
-   * Update trades's state, global R:R and log.
+   * Mets à jour les resultats de trade.
    */
-  updateResults(direction: string, rr: number, tickerTf: any) {
+  async getResult(direction: string) {
     try {
-      if (rr !== undefined) {
-        allTrades.push(rr);
-        if (rr >= 0) {
-          winTrades.push(rr);
-        } else if (rr < 0) {
-          loseTrades.push(rr);
-        }
+      const allData = await this.apiService.getDataFromApi();
+      this.ohlc = allData.data.slice();
+      const i = this.ohlc.length - 2; // candle avant la candle en cour
+      this.haOhlc = this.utils.setHeikenAshiData(this.ohlc);
 
-        if (toDataBase) {
-          this.utils.insertTrade(this.getTickerTfData(tickerTf), tickerTf, winTrades, loseTrades, allTrades);
-        }
-
-        if (direction === 'LONG') {
-          this.setDirection_Long(tickerTf, false);
-        } else if (direction === 'SHORT') {
-          this.setDirection_Short(tickerTf, false);
+      if (direction == 'long') {
+        if (this.isUp(this.ohlc, i, 0)) {
+          this.winTrades.push(this.payout.moonPayout);
+          this.toDataBase ? this.utils.updateFirebaseResults(this.payout.moonPayout) : '';
+          console.log('++ | Payout ', this.payout.moonPayout, '| Total ', this.utils.round(this.utils.arraySum(this.winTrades.concat(this.loseTrades)), 2), '|', this.utils.getDate(this.ohlc[i].time));
+          this.looseInc = 0;
         } else {
-          console.error('Long or short ?');
+          this.loseTrades.push(-1);
+          this.toDataBase ? this.utils.updateFirebaseResults(-1) : '';
+          console.log('-- | Payout ', this.payout.moonPayout, '| Total ', this.utils.round(this.utils.arraySum(this.winTrades.concat(this.loseTrades)), 2), '|', this.utils.getDate(this.ohlc[i].time));
+          this.looseInc++;
         }
-
-        console.log('-------------------------');
-        console.log('---- UPDATED RESULTS ----');
-        console.log('-------------------------');
-        console.log('Last R:R', rr);
-        console.log(direction, tickerTf, this.utils.getDate());
-        console.log('Trades : Gagnes / Perdus / Total', winTrades.length, loseTrades.length, winTrades.length + loseTrades.length);
-        console.log('Total R:R', this.utils.round(loseTrades.reduce((a, b) => a + b, 0) + winTrades.reduce((a, b) => a + b, 0), 2));
-        console.log('Avg R:R', this.utils.round(allTrades.reduce((a, b) => a + b, 0) / allTrades.length, 2));
-        console.log('Winrate ' + this.utils.round((winTrades.length / (loseTrades.length + winTrades.length)) * 100, 2) + '%');
+        this.sendTelegramMsg(this.telegramBot, this.config.chatId, this.formatTelegramMsg());
       }
-    } catch (error) {
-      throw error;
-    }
-  }
 
-
-  /**
-   * Recherche de setup sur les candles closes et les sauvegarde dans AllData
-   */
-  findSetupOnClosedCandles(tickerTf: string) {
-    try {
-      const data = allData[tickerTf].ohlc;
-      const atr = this.indicators.atr(data, 10);
-      const inLong = this.getDirection_Long(tickerTf);
-      const inShort = this.getDirection_Short(tickerTf);
-
-      if (!inLong) {
-        const isLongSetup = this.stratService.strategy_EngulfingRetested_Long(data, atr);
-        if (isLongSetup) {
-          this.setSnapshot_Long(tickerTf, isLongSetup);
+      else if (direction == 'short') {
+        if (!this.isUp(this.ohlc, i, 0)) {
+          this.winTrades.push(this.payout.rektPayout);
+          this.toDataBase ? this.utils.updateFirebaseResults(this.payout.rektPayout) : '';
+          console.log('++ | Payout ', this.payout.rektPayout, '| Total ', this.utils.round(this.utils.arraySum(this.winTrades.concat(this.loseTrades)), 2), '|', this.utils.getDate(this.ohlc[i].time));
+          this.looseInc2 = 0;
+        } else {
+          this.loseTrades.push(-1);
+          this.toDataBase ? this.utils.updateFirebaseResults(-1) : '';
+          console.log('-- | Payout ', this.payout.rektPayout, '| Total ', this.utils.round(this.utils.arraySum(this.winTrades.concat(this.loseTrades)), 2), '|', this.utils.getDate(this.ohlc[i].time));
+          this.looseInc2++;
         }
-      }
-      if (!inShort) {
-        const isShortSetup = this.stratService.strategy_EngulfingRetested_Short(data, atr);
-        if (isShortSetup) {
-          this.setSnapshot_Short(tickerTf, isShortSetup);
-        }
-      } 
-
-      const isLiquidityShort = this.stratService.checkLiquidity_Short(data, atr);
-      const isLiquidityLong = this.stratService.checkLiquidity_Long(data, atr);
-      if (isLiquidityLong) {
-        //console.log(tickerTf + ' | ' + this.utils.getDate() + ' | Bullish liquidity found !');
-        this.setLiquidity_Long(tickerTf, isLiquidityLong);
-      }
-      if (isLiquidityShort) {
-        //console.log(tickerTf + ' | ' + this.utils.getDate() + ' | Bearish liquidity found !');
-        this.setLiquidity_Short(tickerTf, isLiquidityShort);
-      }
-
-      const isLiquidityShortSetup = this.stratService.strategy_LiquidityBreakout_Short(data, this.getLiquidity_Short(tickerTf));
-      const isLiquidityLongSetup = this.stratService.strategy_LiquidityBreakout_Long(data, this.getLiquidity_Long(tickerTf));
-      if (isLiquidityLongSetup) {
-        this.setLiquidity_Long(tickerTf, undefined);
-        this.utils.sendTelegramMsg(telegramBot, this.config.chatId, tickerTf + ' | Bullish liquidity setup');
-      }
-      if (isLiquidityShortSetup) {
-        this.setLiquidity_Short(tickerTf, undefined);
-        this.utils.sendTelegramMsg(telegramBot, this.config.chatId, tickerTf + ' | Bearish liquidity setup');
+        this.sendTelegramMsg(this.telegramBot, this.config.chatId, this.formatTelegramMsg());
       }
     } catch (error) {
       console.error(error);
-      this.utils.stopProcess();
     }
   }
 
 
   /**
-   * GETTER / SETTER
+   * Attend la prochaine candle pour update les résultats.
    */
-  getLiquidity_Long(tickerTf: any) {
-    return allData[tickerTf].liquidity_Long;
-  }
-  getTickerTfData(tickerTf: any) {
-    return allData[tickerTf];
-  }
-  getDirection_Long(tickerTf: any) {
-    return allData[tickerTf].inLong;
-  }
-  getEntryPrice_Long(tickerTf: any) {
-    return allData[tickerTf].entryPrice_Long;
-  }
-  getStopLoss_Long(tickerTf: any) {
-    return allData[tickerTf].initialStopLoss_Long;
-  }
-  getTakeProfit_Long(tickerTf: any) {
-    return allData[tickerTf].takeProfit_Long;
-  }
-  getSnapshot_Long(tickerTf: any) {
-    return allData[tickerTf].snapshot_Long;
-  }
-
-  setLiquidity_Long(tickerTf: any, value: any) {
-    allData[tickerTf].liquidity_Long = value;
-  }
-  setEntryTime_Long(tickerTf: any, value: any) {
-    allData[tickerTf].entryTime_Long = value;
-  }
-  setSnapshot_Long(tickerTf: any, value: any) {
-    allData[tickerTf].snapshot_Long = value;
-  }
-  setSnapshotCanceled_Long(tickerTf: any, value: boolean) {
-    allData[tickerTf].snapshot_Long.canceled = value;
-  }
-  setDirection_Long(tickerTf: any, value: boolean) {
-    allData[tickerTf].inLong = value;
-  }
-  setEntryPrice_Long(tickerTf: any, value: number) {
-    allData[tickerTf].entryPrice_Long = value;
-  }
-  setStopLoss_Long(tickerTf: any, value: number) {
-    allData[tickerTf].initialStopLoss_Long = value;
-  }
-  setTakeProfit_Long(tickerTf: any, value: number) {
-    allData[tickerTf].takeProfit_Long = value;
+  waitingNextCandle(direction: string) {
+    setTimeout(async () => {
+      this.getResult(direction);
+    }, 90000); // 1min 30s
   }
 
 
-  getLiquidity_Short(tickerTf: any) {
-    return allData[tickerTf].liquidity_Short;
-  }
-  getDirection_Short(tickerTf: any) {
-    return allData[tickerTf].inShort;
-  }
-  getEntryPrice_Short(tickerTf: any) {
-    return allData[tickerTf].entryPrice_Short;
-  }
-  getStopLoss_Short(tickerTf: any) {
-    return allData[tickerTf].initialStopLoss_Short;
-  }
-  getTakeProfit_Short(tickerTf: any) {
-    return allData[tickerTf].takeProfit_Short;
-  }
-  getSnapshot_Short(tickerTf: any) {
-    return allData[tickerTf].snapshot_Short;
+  /**
+   * Check for setup on closed candles
+   */
+  bullOrBear() {
+    const i = this.ohlc.length - 1; // candle en construction
+    const rsiValues = this.indicators.rsi(this.ohlc, 14);
+
+    if (this.inLong) {
+      if (this.stopConditions(i)) {
+        this.inLong = false;
+        this.looseInc = 0;
+        console.log('Exit long setup', this.utils.getDate());
+      } else {
+        this.waitingNextCandle('long');
+      }
+    } else if (this.inShort) {
+      if (this.stopConditions(i)) {
+        this.inShort = false;
+        this.looseInc2 = 0;
+        console.log('Exit short setup', this.utils.getDate());
+      } else {
+        this.waitingNextCandle('short');
+      }
+    } else {
+      if (this.stratService.bullStrategy(this.haOhlc, i, rsiValues)) {
+        this.inLong = true;
+        this.waitingNextCandle('long');
+      } else if (this.stratService.bearStrategy(this.haOhlc, i, rsiValues)) {
+        this.inShort = true;
+        this.waitingNextCandle('short');
+      }
+    }
+
   }
 
-  setLiquidity_Short(tickerTf: any, value: any) {
-    allData[tickerTf].liquidity_Short = value;
+  /**
+   * Envoie une notification à Télégram.
+   */
+  sendTelegramMsg(telegramBotObject: any, chatId: string, msg: string) {
+    try {
+      telegramBotObject.sendMessage(chatId, msg);
+    } catch (err) {
+      console.log("Something went wrong when trying to send a Telegram notification", err);
+    }
   }
-  setEntryTime_Short(tickerTf: any, value: any) {
-    allData[tickerTf].entryTime_Short = value;
+
+  formatTelegramMsg() {
+    return 'Total trades : ' + (this.winTrades.length + this.loseTrades.length) + '\n' +
+      'Total R:R : ' + (this.utils.round(this.loseTrades.reduce((a, b) => a + b, 0) + this.winTrades.reduce((a, b) => a + b, 0), 2)) + '\n' +
+      'Winrate : ' + (this.utils.round((this.winTrades.length / (this.loseTrades.length + this.winTrades.length)) * 100, 2) + '%');
   }
-  setSnapshot_Short(tickerTf: any, value: any) {
-    allData[tickerTf].snapshot_Short = value;
-  }
-  setSnapshotCanceled_Short(tickerTf: any, value: boolean) {
-    allData[tickerTf].snapshot_Short.canceled = value;
-  }
-  setDirection_Short(tickerTf: any, value: boolean) {
-    allData[tickerTf].inShort = value;
-  }
-  setEntryPrice_Short(tickerTf: any, value: number) {
-    allData[tickerTf].entryPrice_Short = value;
-  }
-  setStopLoss_Short(tickerTf: any, value: number) {
-    allData[tickerTf].initialStopLoss_Short = value;
-  }
-  setTakeProfit_Short(tickerTf: any, value: number) {
-    allData[tickerTf].takeProfit_Short = value;
+
+  stopConditions(i: number): boolean {
+    return (
+      (this.inLong && this.haOhlc[i].bear) ||
+      (this.inShort && this.haOhlc[i].bull) ||
+      this.looseInc == 5 ||
+      this.looseInc2 == 5 ||
+      Math.abs(this.high(this.ohlc, i, 0) - this.low(this.ohlc, i, 0)) > 80
+    ) ? true : false;
   }
 }
 
 const utilsService = new UtilsService();
-new App(utilsService, new StrategiesService(utilsService), new Config, new IndicatorsService(utilsService));
+new App(
+  utilsService,
+  new StrategiesService(utilsService),
+  new Config(),
+  new IndicatorsService(utilsService),
+  new ApiService(utilsService)
+);
