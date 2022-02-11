@@ -1,5 +1,7 @@
 export class Config {
 
+    xApiKey = 'xApiKey';
+    xApiSecret = 'xApiSecret';
     token = '1909550597:AAGd1H7WU7ZNrW8zhZFy0iQs7RGr6jPl448';
     chatId = '-566798860';
     firebaseConfig = {

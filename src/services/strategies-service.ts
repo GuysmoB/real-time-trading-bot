@@ -3,14 +3,14 @@ import { UtilsService } from "./utils-service";
 
 export class StrategiesService extends CandleAbstract {
 
-  lookback = 1;
+  lookback = 4;
 
   constructor(private utils: UtilsService) {
     super();
   }
 
 
-  bullStrategy(haOhlc: any, i: number, rsiValues: any): any {
+  bullStrategy(haOhlc: any, i: number): any {
     let cond = true;
     for (let j = (i - 1); j >= (i - this.lookback); j--) {
       const ha = haOhlc[j];
@@ -20,7 +20,7 @@ export class StrategiesService extends CandleAbstract {
       }
     }
 
-    if (cond && haOhlc[i].bull /* && rsiValues[i] < 40 */) {
+    if (cond && haOhlc[i].bull) {
       console.log('Entry bull setup', this.utils.getDate());
       return true;
     } else {
@@ -29,7 +29,7 @@ export class StrategiesService extends CandleAbstract {
   }
 
 
-  bearStrategy(haOhlc: any, i: number, rsiValues: any): any {
+  bearStrategy(haOhlc: any, i: number): any {
     let cond = true;
     for (let j = (i - 1); j >= (i - this.lookback); j--) {
       const ha = haOhlc[j];
@@ -39,7 +39,7 @@ export class StrategiesService extends CandleAbstract {
       }
     }
 
-    if (cond && haOhlc[i].bear /* && rsiValues[i] > 60 */) {
+    if (cond && haOhlc[i].bear) {
       console.log('Entry bear setup', this.utils.getDate());
       return true;
     } else {

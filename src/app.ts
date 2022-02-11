@@ -19,10 +19,10 @@ class App extends CandleAbstract {
   loseTrades = [];
   inLong = false;
   inShort = false;
-  allTickers = ['BTC', 'ETH', 'BNB'];
+  allTickers = ['BTC'];
   allTf = ['1', '5'];
   urlPath: string;
-  urlBase = 'https://api.staging.woo.org/';
+  baseUrl = 'https://api.staging.woo.org';
   countdown: any;
   ticker: string;
   tf: string;
@@ -31,8 +31,6 @@ class App extends CandleAbstract {
   telegramBot: any;
   databasePath: string;
   toDataBase = false;
-  isCountDown55 = false;
-  token = 'b15346f6544b4d289139b2feba668b20';
 
   constructor(private utils: UtilsService, private stratService: StrategiesService, private config: Config,
     private indicators: IndicatorsService, private apiService: ApiService) {
@@ -52,11 +50,11 @@ class App extends CandleAbstract {
       let minute = new Date().getMinutes();
 
       if (this.tf == '1') {
-        if (second == 55 && second != lastTime) {
+        if (second == 5 && second != lastTime) {
           this.main();
         }
       } else if (this.tf == '5') {
-        if (second == 55 && (minute.toString().substr(-1) == '4' || minute.toString().substr(-1) == '9') && second != lastTime) {
+        if (second == 5 && (minute.toString().substr(-1) == '5' || minute.toString().substr(-1) == '0') && second != lastTime) {
           this.main();
         }
       }
@@ -69,7 +67,13 @@ class App extends CandleAbstract {
   /**
    * Initialisation de l'app
    */
-  async initApp() {
+  initApp() {
+    try {
+      const res = this.apiService.sendOrder(this.baseUrl +'url' ,'BTC', 'MARKET', 0.11, 'BUY');  
+    } catch (error) {
+      console.error(error);
+    }
+    
     console.log('App started |', this.utils.getDate());
     process.title = 'main';
     this.utils.checkArg(this.ticker, this.tf, this.allTickers, this.allTf);
@@ -157,12 +161,22 @@ class App extends CandleAbstract {
         this.waitingNextCandle('short');
       }
     } else {
-      if (this.stratService.bullStrategy(this.haOhlc, i, rsiValues)) {
-        this.inLong = true;
-        this.waitingNextCandle('long');
-      } else if (this.stratService.bearStrategy(this.haOhlc, i, rsiValues)) {
-        this.inShort = true;
-        this.waitingNextCandle('short');
+      if (this.stratService.bullStrategy(this.haOhlc, i)) {
+        try {
+          const res = this.apiService.sendOrder(this.baseUrl +'url' ,'BTC', 'MARKET', 0.11, 'BUY');  
+          this.inLong = true;
+          this.waitingNextCandle('long');
+        } catch (error) {
+          console.error(error);
+        }
+      } else if (this.stratService.bearStrategy(this.haOhlc, i)) {
+        try {
+          const res = this.apiService.sendOrder(this.baseUrl +'url' ,'BTC', 'MARKET', 0.11, 'SELL');  
+          this.inShort = true;
+          this.waitingNextCandle('short');
+        } catch (error) {
+          console.error(error);
+        }
       }
     }
 
@@ -195,10 +209,11 @@ class App extends CandleAbstract {
 }
 
 const utilsService = new UtilsService();
+const config = new Config();
 new App(
   utilsService,
   new StrategiesService(utilsService),
-  new Config(),
+  config,
   new IndicatorsService(utilsService),
-  new ApiService(utilsService)
+  new ApiService(utilsService, config)
 );

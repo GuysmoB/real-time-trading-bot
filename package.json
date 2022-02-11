@@ -5,6 +5,8 @@
   "main": "dist/app.js",
   "scripts": {
     "start": "tsc && node dist/app.js",
+    "debug": "tsc && node dist/app.js BTC 1",
+    "stop": "pkill --signal SIGINT main",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -19,6 +21,7 @@
   },
   "homepage": "https://github.com/GuysmoB/real-time-trading-bot#readme",
   "dependencies": {
+    "crypto-js": "^4.1.1",
     "file-system": "^2.2.2",
     "firebase": "^8.0.2",
     "ig-api": "^0.15.0",
