@@ -19,7 +19,7 @@ export class ApiService {
     });
   }
 
-  async sendOrder(url: string, symbol: string, orderType: string, orderAmount: Number, side: string) {
+  async sendOrder(symbol: string, orderType: string, orderAmount: Number, side: string) {
     const xApiTimestamp = Date.now();
     const queryString = 'symbol=' +symbol +'&order_type=' +orderType +'&order_amount=' +orderAmount +'&side=' +side +'|' +xApiTimestamp;
 
@@ -42,12 +42,34 @@ export class ApiService {
     console.log('header', headers)
     console.log('data', data)
 
-    try {
-      const res = await axios.post(url, data, headers);  
+    /* try {
+      const res = await axios.post(this.config.baseUrl +'/v1/order', data, headers);  
       console.log('response', res);
       return res;
     } catch (error) {
       throw new Error('Error with sendOrder : ' +error +'\n' + 'queryString : ' +queryString)
+    } */
+  }
+
+
+  async getAccountInfo() {
+    const xApiTimestamp = Date.now();
+    const queryString = +'|' +xApiTimestamp;
+
+    const headers = {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'x-api-key': this.config.xApiKey,
+      'x-api-signature': cryptoJS.HmacSHA256(this.config.xApiSecret, queryString).toString(),
+      'x-api-timestamp': xApiTimestamp,
+      'cache-control': 'no-cache'
+    };
+
+    try {
+      const res = await axios.get(this.config.baseUrl +'/v1/client/info', headers);  
+      console.log('response', res);
+      return res;
+    } catch (error) {
+      throw new Error('Error with getAccountInfo : ' +error +'\n' + 'queryString : ' +queryString)
     }
   }
 

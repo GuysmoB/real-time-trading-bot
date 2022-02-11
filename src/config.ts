@@ -2,6 +2,9 @@ export class Config {
 
     xApiKey = 'xApiKey';
     xApiSecret = 'xApiSecret';
+    baseUrl = 'https://api.staging.woo.org';
+    wsMarketDataUrl = 'wss://wss.staging.woo.org/ws/stream/';
+    wsUserDataUrl = 'wss://wss.staging.woo.org/v2/ws/private/stream/';
     token = '1909550597:AAGd1H7WU7ZNrW8zhZFy0iQs7RGr6jPl448';
     chatId = '-566798860';
     firebaseConfig = {

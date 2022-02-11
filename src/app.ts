@@ -11,7 +11,7 @@ import { UtilsService } from "./services/utils-service";
 import { Config } from "./config";
 import firebase from "firebase";
 import TelegramBot from "node-telegram-bot-api";
-//import WebSocket from "ws";
+import WebSocket from "ws";
 
 class App extends CandleAbstract {
 
@@ -22,9 +22,12 @@ class App extends CandleAbstract {
   allTickers = ['BTC'];
   allTf = ['1', '5'];
   urlPath: string;
-  baseUrl = 'https://api.staging.woo.org';
   countdown: any;
   ticker: string;
+  accountInfo: any;
+  orderInfo: any;
+  kline: any;
+  stoploss: number;
   tf: string;
   ohlc = [];
   haOhlc = [];
@@ -69,16 +72,93 @@ class App extends CandleAbstract {
    */
   initApp() {
     try {
-      const res = this.apiService.sendOrder(this.baseUrl +'url' ,'BTC', 'MARKET', 0.11, 'BUY');  
+      this.accountInfo = this.apiService.getAccountInfo();
+      this.getCandleStreamData(this.config.wsMarketDataUrl + this.accountInfo.application.application_id + '/ping');
+      this.getPrivateUserData(this.config.wsUserDataUrl + this.accountInfo.application.application_id + '/ping');
+      //this.getCandleStreamData(this.config.wsBaseUrl +this.accountInfo.application.application_id +'/subscribe/' +'SPOT_BTC_USDT@kline_1m');
+      //const res = this.apiService.sendOrder('BTC', 'MARKET', 0.11, 'BUY');  
     } catch (error) {
       console.error(error);
     }
-    
+
     console.log('App started |', this.utils.getDate());
     process.title = 'main';
     this.utils.checkArg(this.ticker, this.tf, this.allTickers, this.allTf);
     this.toDataBase ? this.utils.initFirebase(this.databasePath) : '';
     this.telegramBot = new TelegramBot(this.config.token, { polling: false });
+  }
+
+
+  /**
+  * Ecoute le WS et récupère les valeurs OHLC.
+  */
+  async getCandleStreamData(url: string) {
+    let ws = new WebSocket(url);
+    const _this = this;
+
+    ws.onopen = function () {
+      console.log("Socket for kline data is connected. Listenning data ...");
+    }
+
+    ws.onmessage = function (event: any) {
+      console.log(JSON.parse(event.data));
+      if (this.inLong) {
+        if (this.kline.close <= this.stoploss) {
+          try {
+            //const res = this.apiService.cancelOrder(this.orderInfo.order_id,'BTC');  
+          } catch (error) {
+            console.error(error);
+          }
+        }
+      }
+    };
+
+    ws.onclose = function (e) {
+      console.log('Socket for kline data is closed. Reconnect will be attempted in 1 second.', e.reason);
+      setTimeout(function () {
+        _this.getCandleStreamData(url);
+      }, 1000);
+      _this.sendTelegramMsg(_this.telegramBot, _this.config.chatId, 'Reconnecting ...');
+    };
+
+    ws.onerror = function (err: any) {
+      console.error('Socket encountered error: ', err.message, 'Closing socket');
+      ws.close();
+    };
+  }
+
+
+  /**
+   * Ecoute le WS et récupère les données privées du user.
+   */
+  async getPrivateUserData(url: string) {
+    let ws = new WebSocket(url);
+    const _this = this;
+
+    ws.onopen = function () {
+      console.log("Socket for private user data is connected. Listenning data ...");
+    }
+
+    ws.onmessage = function (event: any) {
+      const data = JSON.parse(event.data)
+      console.log(data);
+      if (data) { // Si le trade a bien été annulé
+         this.inLong = false;
+      }
+    };
+
+    ws.onclose = function (e) {
+      console.log('Socket for private user data is closed. Reconnect will be attempted in 1 second.', e.reason);
+      setTimeout(function () {
+        _this.getPrivateUserData(url);
+      }, 1000);
+      _this.sendTelegramMsg(_this.telegramBot, _this.config.chatId, 'Reconnecting ...');
+    };
+
+    ws.onerror = function (err: any) {
+      console.error('Socket encountered error: ', err.message, 'Closing socket');
+      ws.close();
+    };
   }
 
   /**
@@ -163,7 +243,7 @@ class App extends CandleAbstract {
     } else {
       if (this.stratService.bullStrategy(this.haOhlc, i)) {
         try {
-          const res = this.apiService.sendOrder(this.baseUrl +'url' ,'BTC', 'MARKET', 0.11, 'BUY');  
+          //this.orderInfo = this.apiService.sendOrder(this.baseUrl +'url' ,'BTC', 'MARKET', 0.11, 'BUY');  
           this.inLong = true;
           this.waitingNextCandle('long');
         } catch (error) {
@@ -171,7 +251,7 @@ class App extends CandleAbstract {
         }
       } else if (this.stratService.bearStrategy(this.haOhlc, i)) {
         try {
-          const res = this.apiService.sendOrder(this.baseUrl +'url' ,'BTC', 'MARKET', 0.11, 'SELL');  
+          //this.orderInfo = this.apiService.sendOrder(this.baseUrl +'url' ,'BTC', 'MARKET', 0.11, 'SELL');  
           this.inShort = true;
           this.waitingNextCandle('short');
         } catch (error) {
