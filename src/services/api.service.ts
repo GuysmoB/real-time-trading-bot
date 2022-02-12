@@ -21,12 +21,12 @@ export class ApiService {
 
   async sendOrder(symbol: string, orderType: string, orderAmount: Number, side: string) {
     const xApiTimestamp = Date.now();
-    const queryString = 'symbol=' +symbol +'&order_type=' +orderType +'&order_amount=' +orderAmount +'&side=' +side +'|' +xApiTimestamp;
+    const queryString = 'symbol=' + symbol + '&order_type=' + orderType + '&order_amount=' + orderAmount + '&side=' + side + '|' + xApiTimestamp;
 
     const headers = {
       'Content-Type': 'application/x-www-form-urlencoded',
       'x-api-key': this.config.xApiKey,
-      'x-api-signature': cryptoJS.HmacSHA256(this.config.xApiSecret, queryString).toString(),
+      'x-api-signature': cryptoJS.HmacSHA256(queryString, this.config.xApiSecret).toString(),
       'x-api-timestamp': xApiTimestamp,
       'cache-control': 'no-cache'
     };
@@ -54,22 +54,23 @@ export class ApiService {
 
   async getAccountInfo() {
     const xApiTimestamp = Date.now();
-    const queryString = +'|' +xApiTimestamp;
+    const queryString = '|' + xApiTimestamp;
 
     const headers = {
       'Content-Type': 'application/x-www-form-urlencoded',
       'x-api-key': this.config.xApiKey,
-      'x-api-signature': cryptoJS.HmacSHA256(this.config.xApiSecret, queryString).toString(),
+      //'x-api-signature': cryptoJS.HmacSHA256('order_price=9000&order_quantity=0.11&order_type=LIMIT&side=BUY&symbol=SPOT_BTC_USDT|1578565539808', 'QHKRXHPAW1MC9YGZMAT8YDJG2HPR').toString(),
+      'x-api-signature': cryptoJS.HmacSHA256(queryString, this.config.xApiSecret).toString(),
       'x-api-timestamp': xApiTimestamp,
       'cache-control': 'no-cache'
     };
 
     try {
-      const res = await axios.get(this.config.baseUrl +'/v1/client/info', headers);  
-      console.log('response', res);
-      return res;
+      const res = await axios.get(this.config.baseUrl + '/v1/client/info', { headers: headers });
+      //console.log('response', res);
+      return res.data;
     } catch (error) {
-      throw new Error('Error with getAccountInfo : ' +error +'\n' + 'queryString : ' +queryString)
+      throw new Error('Error with getAccountInfo : ' + error + '\n' + 'queryString : ' + queryString)
     }
   }
 

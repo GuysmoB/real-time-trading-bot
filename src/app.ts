@@ -70,11 +70,11 @@ class App extends CandleAbstract {
   /**
    * Initialisation de l'app
    */
-  initApp() {
+  async initApp() {
     try {
-      this.accountInfo = this.apiService.getAccountInfo();
-      this.getCandleStreamData(this.config.wsMarketDataUrl + this.accountInfo.application.application_id + '/ping');
-      this.getPrivateUserData(this.config.wsUserDataUrl + this.accountInfo.application.application_id + '/ping');
+      this.accountInfo = await this.apiService.getAccountInfo();
+      //this.getCandleStreamData(this.config.wsMarketDataUrl + this.config.appId);
+      //this.getPrivateUserData(this.config.wsUserDataUrl + this.config.appId);
       //this.getCandleStreamData(this.config.wsBaseUrl +this.accountInfo.application.application_id +'/subscribe/' +'SPOT_BTC_USDT@kline_1m');
       //const res = this.apiService.sendOrder('BTC', 'MARKET', 0.11, 'BUY');  
     } catch (error) {
@@ -97,12 +97,16 @@ class App extends CandleAbstract {
     const _this = this;
 
     ws.onopen = function () {
-      console.log("Socket for kline data is connected. Listenning data ...");
+      console.log("Socket is connected. Listenning data ...");
+      const msg = {
+        "event": "ping"
+      };
+      ws.send(JSON.stringify(msg));
     }
 
     ws.onmessage = function (event: any) {
-      console.log(JSON.parse(event.data));
-      if (this.inLong) {
+      console.log(event.data);
+      /* if (this.inLong) {
         if (this.kline.close <= this.stoploss) {
           try {
             //const res = this.apiService.cancelOrder(this.orderInfo.order_id,'BTC');  
@@ -110,7 +114,7 @@ class App extends CandleAbstract {
             console.error(error);
           }
         }
-      }
+      } */
     };
 
     ws.onclose = function (e) {
@@ -143,7 +147,7 @@ class App extends CandleAbstract {
       const data = JSON.parse(event.data)
       console.log(data);
       if (data) { // Si le trade a bien été annulé
-         this.inLong = false;
+        this.inLong = false;
       }
     };
 
