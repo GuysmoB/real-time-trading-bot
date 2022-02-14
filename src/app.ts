@@ -172,27 +172,27 @@ class App extends CandleAbstract {
       console.log('RR : ' +rr +' | Total ', this.utils.round(this.utils.arraySum(this.winTrades.concat(this.loseTrades)), 2), '|', this.utils.getDate(this.ohlc[i].time));
 
     } else {
-      if (!this.inLong) {
-        const res = this.stratService.bullStrategy(this.haOhlc, this.ohlc, i, this.ratio2p5)
-        if (res.startTrade) {
+      if (!this.inLong && !this.inShort) {
+        const resLong = this.stratService.bullStrategy(this.haOhlc, this.ohlc, i, this.ratio2p5)
+        if (resLong.startTrade) {
           this.inLong = true;
-          this.entryPrice = res.entryPrice;
-          this.stoploss = res.stopLoss;
+          this.entryPrice = resLong.entryPrice;
+          this.stoploss = resLong.stopLoss;
           console.log('Entry bull setup', this.utils.getDate());
           console.log('entryPrice', this.entryPrice);
           console.log('init stopLoss', this.stoploss);
+        } else {
+          const resShort = this.stratService.bearStrategy(this.haOhlc, this.ohlc, i, this.ratio2p5)
+          if (resShort.startTrade) {
+            this.inShort = true;
+            this.entryPrice = resShort.entryPrice;
+            this.stoploss = resShort.stopLoss;
+            console.log('Entry bear setup', this.utils.getDate());
+            console.log('entryPrice', this.entryPrice);
+            console.log('init stopLoss', this.stoploss);
+          }
         }
-      } else if (!this.inShort) {
-        const res = this.stratService.bearStrategy(this.haOhlc, this.ohlc, i, this.ratio2p5)
-        if (res.startTrade) {
-          this.inShort = true;
-          this.entryPrice = res.entryPrice;
-          this.stoploss = res.stopLoss;
-          console.log('Entry bear setup', this.utils.getDate());
-          console.log('entryPrice', this.entryPrice);
-          console.log('init stopLoss', this.stoploss);
-        }
-      }
+      } 
     }
   }
 
