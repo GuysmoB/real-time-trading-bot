@@ -1,40 +1,155 @@
-import { promisify } from "util";
 import firebase from "firebase";
 import fs from "fs";
-import { error } from "console";
 
 export class UtilsService {
-  constructor() { }
+  constructor() {}
 
+
+    /**
+   * Permet de retourner le R:R
+   */
+     getRiskReward(entryPrice: number, initialStopLoss: number, closedPrice: number): number {
+      return this.round((closedPrice - entryPrice) / (entryPrice - initialStopLoss), 2);
+    }
+
+  /**
+   * Récupère le bid et ask depuis le buffer U = u + 1
+   */
+  getBidAskFromBuffer(tmpBuffer: any) {
+    let bids = [];
+    let asks = [];
+
+    try {
+      for (let i = 0; i < tmpBuffer.length; i++) {
+        const element = tmpBuffer[i].data; //.data pourr les futurs
+
+        /* if (i > 1) {
+            const element1 = tmpBuffer[i - 1].data;
+            if (element.U != element1.u + 1) {
+              throw new Error('u dans le mauvais ordre chrono');
+            }
+          } */
+        bids = [...bids, ...this.convertArrayToNumber(element.b)];
+        asks = [...asks, ...this.convertArrayToNumber(element.a)];
+      }
+    } catch (error) {
+      console.log(error);
+    }
+
+    return {
+      bids,
+      asks,
+    };
+  }
+
+  getVolumeDepth(snapshot: any, depth: number) {
+    const price = snapshot.bids[0][0];
+    const bidLimitDepthPrice = price - price * (depth / 100);
+    const askLimitDepthPrice = price + price * (depth / 100);
+    let bidResult = [];
+    let askResult = [];
+
+    for (const i in snapshot.bids) {
+      const elementPrice = snapshot.bids[i][0];
+      const elementQuantity = snapshot.bids[i][1];
+
+      if (elementPrice < bidLimitDepthPrice) {
+        break;
+      } else {
+        bidResult.push(elementQuantity);
+      }
+    }
+
+    for (const i in snapshot.asks) {
+      const elementPrice = snapshot.asks[i][0];
+      const elementQuantity = snapshot.asks[i][1];
+
+      if (elementPrice > askLimitDepthPrice) {
+        break;
+      } else {
+        askResult.push(elementQuantity);
+      }
+    }
+
+    return {
+      bidQuantity: bidResult,
+      bidVolume: this.round(
+        bidResult.reduce((a, b) => a + b, 0),
+        2
+      ),
+      askQuantity: askResult,
+      askVolume: this.round(
+        askResult.reduce((a, b) => a + b, 0),
+        2
+      ),
+    };
+  }
+
+  /**
+   * Convertis un tableau en []number
+   */
+  convertArrayToNumber(array: any) {
+    for (const i in array) {
+      array[i][0] = +array[i][0];
+      array[i][1] = +array[i][1];
+    }
+    return array;
+  }
+
+  /**
+   * Mets à jour l'orderbook avec les données du buffer
+   */
+  obUpdate(buffer: Number[][], snapshot: Number[][]) {
+    try {
+      for (let i = 0; i < buffer.length; i++) {
+        const price = buffer[i][0];
+        const quantity = buffer[i][1];
+
+        const index = snapshot.findIndex((x) => x[0] == price);
+        if (index >= 0) {
+          if (quantity == 0) {
+            snapshot.splice(index, 1);
+          } else {
+            snapshot[index][1] = quantity;
+          }
+        } else if (index == -1 && quantity != 0) {
+          snapshot.push([price, quantity]);
+        }
+      }
+    } catch (error) {
+      console.log(error);
+    }
+
+    return snapshot;
+  }
 
   /**
    * Prend en compte les fees de Hxro
    */
   addFees(gain: number) {
-    return gain - (gain * 0.03)
+    return gain - gain * 0.03;
   }
 
   /**
-  * Permet d'arrêter le processus.
-  */
+   * Permet d'arrêter le processus.
+   */
   stopProcess(msg: string) {
-    console.error(msg)
+    console.error(msg);
     process.exit(1);
   }
-
 
   /**
    * Check la validité des arguments passés à l'app.
    */
   checkArg(ticker: string, tf: string, allTicker: any, allTf: any) {
     if (!allTicker.includes(ticker) || !allTf.includes(tf)) {
-      this.stopProcess('Argument error: ' + ticker + ' ' + tf);
+      this.stopProcess("Argument error: " + ticker + " " + tf);
     }
   }
 
   /**
- * Fait la somme des nombres d'un tableau
- */
+   * Fait la somme des nombres d'un tableau
+   */
   arraySum(array: any) {
     return array.reduce((a, b) => a + b, 0);
   }
@@ -93,7 +208,7 @@ export class UtilsService {
       if (j === 0) {
         const _close = this.round(
           (source[j].open + source[j].high + source[j].low + source[j].close) /
-          4,
+            4,
           5
         );
         const _open = this.round((source[j].open + source[j].close) / 2, 5);
@@ -131,7 +246,6 @@ export class UtilsService {
     return result;
   }
 
-
   /**
    * Retourne la date avec décalage horaire.
    */
@@ -143,42 +257,57 @@ export class UtilsService {
     const hours = "0" + date.getHours();
     const minutes = "0" + date.getMinutes();
     const second = "0" + date.getSeconds();
-    return (day.substr(-2) + "/" + month.substr(-2) + "/" + year + " " + hours.substr(-2) + ":" + minutes.substr(-2) + ":" + second.substr(-2));
+    return (
+      day.substr(-2) +
+      "/" +
+      month.substr(-2) +
+      "/" +
+      year +
+      " " +
+      hours.substr(-2) +
+      ":" +
+      minutes.substr(-2) +
+      ":" +
+      second.substr(-2)
+    );
   }
 
-
-
   /**
-    * Insert chaque trade dans Firebase.
-    */
+   * Insert chaque trade dans Firebase.
+   */
   async updateFirebaseResults($rr: any, databasePath: string) {
     try {
       const res = await this.getFirebaseResults(databasePath);
       if (res) {
-        const $winTrades = ($rr > 0) ? res.winTrades + 1 : res.winTrades;
-        const $loseTrades = ($rr < 0) ? res.loseTrades + 1 : res.loseTrades;
-        const $winrate = this.round(($winTrades / ($loseTrades + $winTrades)) * 100, 2);
+        const $winTrades = $rr > 0 ? res.winTrades + 1 : res.winTrades;
+        const $loseTrades = $rr < 0 ? res.loseTrades + 1 : res.loseTrades;
+        const $winrate = this.round(
+          ($winTrades / ($loseTrades + $winTrades)) * 100,
+          2
+        );
         await firebase.database().ref(databasePath).remove();
-        await firebase.database().ref(databasePath).push({
-          winTrades: $winTrades,
-          loseTrades: $loseTrades,
-          totalTrades: res.totalTrades + 1,
-          totalRR: res.totalRR + $rr,
-          'winrate%': $winrate ? $winrate : 0,
-        });
+        await firebase
+          .database()
+          .ref(databasePath)
+          .push({
+            winTrades: $winTrades,
+            loseTrades: $loseTrades,
+            totalTrades: res.totalTrades + 1,
+            totalRR: res.totalRR + $rr,
+            "winrate%": $winrate ? $winrate : 0,
+          });
       }
     } catch (error) {
-      throw new Error('Error updateFirebaseResults()' + error);
+      throw new Error("Error updateFirebaseResults()" + error);
     }
   }
-
 
   /**
    * Récupère les resultats depuis Firebase.
    */
   async getFirebaseResults(databasePath: string) {
     try {
-      let snapshot = await firebase.database().ref(databasePath).once('value');
+      let snapshot = await firebase.database().ref(databasePath).once("value");
       if (snapshot.exists()) {
         const id = Object.keys(snapshot.val())[0];
         return snapshot.child(id).val();
@@ -201,14 +330,13 @@ export class UtilsService {
           loseTrades: 0,
           totalTrades: 0,
           totalRR: 0,
-          'winrate%': 0,
+          "winrate%": 0,
         });
       }
     } catch (error) {
-      throw new Error('Error initFirebase()' + error);
+      throw new Error("Error initFirebase()" + error);
     }
   }
-
 }
 
 export default new UtilsService();

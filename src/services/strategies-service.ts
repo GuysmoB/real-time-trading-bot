@@ -3,14 +3,14 @@ import { UtilsService } from "./utils-service";
 
 export class StrategiesService extends CandleAbstract {
 
-  lookback = 4;
+  lookback = 1;
 
   constructor(private utils: UtilsService) {
     super();
   }
 
 
-  bullStrategy(haOhlc: any, i: number): any {
+  bullStrategy(haOhlc: any, data: any, i: number, ratio: any): any {
     let cond = true;
     for (let j = (i - 1); j >= (i - this.lookback); j--) {
       const ha = haOhlc[j];
@@ -20,16 +20,15 @@ export class StrategiesService extends CandleAbstract {
       }
     }
 
-    if (cond && haOhlc[i].bull) {
-      console.log('Entry bull setup', this.utils.getDate());
-      return true;
-    } else {
-      return false;
-    }
+    return {
+      startTrade: cond && haOhlc[i].bull /* && ratio > 0 */,
+      stopLoss: this.utils.lowest(data, i - 1, 'low', 1),
+      entryPrice: this.close(data, i, 0) + 5
+    };
   }
 
 
-  bearStrategy(haOhlc: any, i: number): any {
+  bearStrategy(haOhlc: any, data: any, i: number, ratio: any): any {
     let cond = true;
     for (let j = (i - 1); j >= (i - this.lookback); j--) {
       const ha = haOhlc[j];
@@ -39,12 +38,11 @@ export class StrategiesService extends CandleAbstract {
       }
     }
 
-    if (cond && haOhlc[i].bear) {
-      console.log('Entry bear setup', this.utils.getDate());
-      return true;
-    } else {
-      return false;
-    }
+    return {
+      startTrade: cond && haOhlc[i].bear/*  && ratio < 0 */,
+      stopLoss: this.utils.highest(data, i - 1, 'high', 1),
+      entryPrice: this.close(data, i, 0) - 5
+    };
   }
 }
 
