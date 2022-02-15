@@ -13,8 +13,7 @@ export class StrategiesService extends CandleAbstract {
   bullStrategy(haOhlc: any, data: any, i: number, ratio: any): any {
     let cond = true;
     for (let j = (i - 1); j >= (i - this.lookback); j--) {
-      const ha = haOhlc[j];
-      if (ha.bull) {
+      if (haOhlc[j].bull) {
         cond = false;
         break;
       }
@@ -31,8 +30,7 @@ export class StrategiesService extends CandleAbstract {
   bearStrategy(haOhlc: any, data: any, i: number, ratio: any): any {
     let cond = true;
     for (let j = (i - 1); j >= (i - this.lookback); j--) {
-      const ha = haOhlc[j];
-      if (ha.bear) {
+      if (haOhlc[j].bear) {
         cond = false;
         break;
       }

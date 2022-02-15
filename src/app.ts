@@ -113,7 +113,7 @@ class App extends CandleAbstract {
 
 
 /**
- * Ecoute le WS et ajuste high/low à chaque tick.
+ * Ecoute le WS.
  */
  async getObStreamData(url: string) {
   this.snapshot = await this.apiService.getObSnapshot();
@@ -148,10 +148,10 @@ class App extends CandleAbstract {
    * Check for setup on closed candles
    */
   bullOrBear() {
-    const i = this.ohlc.length - 1; // candle en construction
+    const i = this.ohlc.length - 2; // derniere candle cloturée
 
     if (this.stopConditions(i)) {
-      const rr = this.utils.getRiskReward(this.entryPrice, this.stoploss, this.ohlc[i].open);
+      const rr = this.utils.getRiskReward(this.entryPrice, this.stoploss, this.ohlc[i].close);
       if (rr >= 0) {
         this.winTrades.push(rr);
       } else if (rr < 0) {
@@ -166,34 +166,34 @@ class App extends CandleAbstract {
         console.log('Exit short setup', this.utils.getDate());
       }
       
-      this.toDataBase ? this.utils.updateFirebaseResults(rr, this.databasePath) : '';
-      this.sendTelegramMsg(this.telegramBot, this.config.chatId, this.formatTelegramMsg());
+      /* this.toDataBase ? this.utils.updateFirebaseResults(rr, this.databasePath) : '';
+      this.sendTelegramMsg(this.telegramBot, this.config.chatId, this.formatTelegramMsg()); */
       console.log('Cloture', this.ohlc[i].open);
       console.log('RR : ' +rr +' | Total ', this.utils.round(this.utils.arraySum(this.winTrades.concat(this.loseTrades)), 2), '|', this.utils.getDate(this.ohlc[i].time));
+      console.log('------------');
+    }  
 
-    } else {
-      if (!this.inLong && !this.inShort) {
-        const resLong = this.stratService.bullStrategy(this.haOhlc, this.ohlc, i, this.ratio2p5)
-        if (resLong.startTrade) {
-          this.inLong = true;
-          this.entryPrice = resLong.entryPrice;
-          this.stoploss = resLong.stopLoss;
-          console.log('Entry bull setup', this.utils.getDate());
-          console.log('entryPrice', this.entryPrice);
-          console.log('init stopLoss', this.stoploss);
-        } else {
-          const resShort = this.stratService.bearStrategy(this.haOhlc, this.ohlc, i, this.ratio2p5)
-          if (resShort.startTrade) {
-            this.inShort = true;
-            this.entryPrice = resShort.entryPrice;
-            this.stoploss = resShort.stopLoss;
-            console.log('Entry bear setup', this.utils.getDate());
-            console.log('entryPrice', this.entryPrice);
-            console.log('init stopLoss', this.stoploss);
-          }
+    if (!this.inLong && !this.inShort) {
+      const resLong = this.stratService.bullStrategy(this.haOhlc, this.ohlc, i, this.ratio2p5)
+      if (resLong.startTrade) {
+        this.inLong = true;
+        this.entryPrice = resLong.entryPrice;
+        this.stoploss = resLong.stopLoss;
+        console.log('Entry long setup', this.utils.getDate());
+        console.log('EntryPrice', this.entryPrice);
+        console.log('StopLoss', this.stoploss);
+      } else {
+        const resShort = this.stratService.bearStrategy(this.haOhlc, this.ohlc, i, this.ratio2p5)
+        if (resShort.startTrade) {
+          this.inShort = true;
+          this.entryPrice = resShort.entryPrice;
+          this.stoploss = resShort.stopLoss;
+          console.log('Entry short setup', this.utils.getDate());
+          console.log('EntryPrice', this.entryPrice);
+          console.log('StopLoss', this.stoploss);
         }
-      } 
-    }
+      }
+    } 
   }
 
   /**
