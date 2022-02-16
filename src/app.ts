@@ -37,7 +37,7 @@ class App extends CandleAbstract {
   haOhlc = [];
   telegramBot: any;
   databasePath: string;
-  toDataBase = false;
+  toDataBase = true;
 
   constructor(private utils: UtilsService, private stratService: StrategiesService, private config: Config,
     private indicators: IndicatorsService, private apiService: ApiService) {
@@ -47,7 +47,7 @@ class App extends CandleAbstract {
     this.ticker = process.argv.slice(2)[0];
     this.tf = process.argv.slice(2)[1];
     this.urlPath = 'https://' + this.ticker + '.history.hxro.io/' + this.tf + 'm';
-    this.databasePath = '/' + this.ticker + this.tf;
+    this.databasePath = '/woo-' + this.ticker + this.tf;
     this.initApp();
 
     let lastTime: number;
@@ -84,7 +84,7 @@ class App extends CandleAbstract {
 
 
   /**
-   * Gère la création des candles et de la logique principale..
+   * Gère la logique principale
    */
   async main() {
     this.manageOb();
@@ -158,18 +158,12 @@ class App extends CandleAbstract {
         this.loseTrades.push(rr);
       }
 
-      if (this.inLong) {
-        this.inLong = false;
-        console.log('Exit long setup', this.utils.getDate());
-      } else if (this.inShort) {
-        this.inShort = false;
-        console.log('Exit short setup', this.utils.getDate());
-      }
-      
-      /* this.toDataBase ? this.utils.updateFirebaseResults(rr, this.databasePath) : '';
-      this.sendTelegramMsg(this.telegramBot, this.config.chatId, this.formatTelegramMsg()); */
+      this.inLong ? this.inLong = false : this.inLong;
+      this.inShort ? this.inShort = false : this.inShort;
+      this.toDataBase ?? this.utils.updateFirebaseResults(rr, this.databasePath);
+      /*this.sendTelegramMsg(this.telegramBot, this.config.chatId, this.formatTelegramMsg()); */
       console.log('Cloture', this.ohlc[i].open);
-      console.log('RR : ' +rr +' | Total ', this.utils.round(this.utils.arraySum(this.winTrades.concat(this.loseTrades)), 2), '|', this.utils.getDate(this.ohlc[i].time));
+      console.log('RR : ' +rr +' | Total ', this.utils.round(this.utils.arraySum(this.winTrades.concat(this.loseTrades)), 2), '|', this.utils.getDate());
       console.log('------------');
     }  
 

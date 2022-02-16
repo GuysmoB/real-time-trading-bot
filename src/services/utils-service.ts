@@ -8,8 +8,9 @@ export class UtilsService {
     /**
    * Permet de retourner le R:R
    */
-     getRiskReward(entryPrice: number, initialStopLoss: number, closedPrice: number): number {
-      return this.round((closedPrice - entryPrice) / (entryPrice - initialStopLoss), 2);
+     getRiskReward(entryPrice: number, stopLoss: number, closedPrice: number): number {
+      const rr = this.round((closedPrice - entryPrice) / (entryPrice - stopLoss), 2);
+      return (rr <= -1 ? -1 : rr)
     }
 
   /**
@@ -281,10 +282,7 @@ export class UtilsService {
       if (res) {
         const $winTrades = $rr > 0 ? res.winTrades + 1 : res.winTrades;
         const $loseTrades = $rr < 0 ? res.loseTrades + 1 : res.loseTrades;
-        const $winrate = this.round(
-          ($winTrades / ($loseTrades + $winTrades)) * 100,
-          2
-        );
+        const $winrate = this.round(($winTrades / ($loseTrades + $winTrades)) * 100, 2);
         await firebase.database().ref(databasePath).remove();
         await firebase
           .database()
@@ -293,7 +291,7 @@ export class UtilsService {
             winTrades: $winTrades,
             loseTrades: $loseTrades,
             totalTrades: res.totalTrades + 1,
-            totalRR: res.totalRR + $rr,
+            totalRR: this.round(res.totalRR + $rr, 2),
             "winrate%": $winrate ? $winrate : 0,
           });
       }
