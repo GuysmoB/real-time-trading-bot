@@ -4,14 +4,29 @@ import fs from "fs";
 export class UtilsService {
   constructor() {}
 
-
-    /**
+  /**
    * Permet de retourner le R:R
    */
-     getRiskReward(entryPrice: number, stopLoss: number, closedPrice: number): number {
-      const rr = this.round((closedPrice - entryPrice) / (entryPrice - stopLoss), 2);
-      return (rr <= -1 ? -1 : rr)
-    }
+  getRiskReward(entryPrice: number, stopLoss: number, closedPrice: number): number {
+    const rr = this.round((closedPrice - entryPrice) / (entryPrice - stopLoss), 2);
+    return rr <= -1 ? -1 : rr;
+  }
+
+  /**
+   * Mets en forme le msg telegram
+   */
+  formatTelegramMsg(loseTrades: any, winTrades: any) {
+    return (
+      "Total trades : " +
+      (winTrades.length + loseTrades.length) +
+      "\n" +
+      "Total R:R : " +
+      this.round(loseTrades.reduce((a, b) => a + b, 0) + winTrades.reduce((a, b) => a + b, 0), 2) +
+      "\n" +
+      "Winrate : " +
+      (this.round((winTrades.length / (loseTrades.length + winTrades.length)) * 100, 2) + "%")
+    );
+  }
 
   /**
    * Récupère le bid et ask depuis le buffer U = u + 1
@@ -207,11 +222,7 @@ export class UtilsService {
 
     for (let j = 0; j < source.length; j++) {
       if (j === 0) {
-        const _close = this.round(
-          (source[j].open + source[j].high + source[j].low + source[j].close) /
-            4,
-          5
-        );
+        const _close = this.round((source[j].open + source[j].high + source[j].low + source[j].close) / 4, 5);
         const _open = this.round((source[j].open + source[j].close) / 2, 5);
         result.push({
           close: _close,
@@ -222,23 +233,13 @@ export class UtilsService {
           bear: _close < _open,
         });
       } else {
-        const haCloseVar =
-          (source[j].open + source[j].high + source[j].low + source[j].close) /
-          4;
-        const haOpenVar =
-          (result[result.length - 1].open + result[result.length - 1].close) /
-          2;
+        const haCloseVar = (source[j].open + source[j].high + source[j].low + source[j].close) / 4;
+        const haOpenVar = (result[result.length - 1].open + result[result.length - 1].close) / 2;
         result.push({
           close: this.round(haCloseVar, 5),
           open: this.round(haOpenVar, 5),
-          low: this.round(
-            Math.min(source[j].low, Math.max(haOpenVar, haCloseVar)),
-            5
-          ),
-          high: this.round(
-            Math.max(source[j].high, Math.max(haOpenVar, haCloseVar)),
-            5
-          ),
+          low: this.round(Math.min(source[j].low, Math.max(haOpenVar, haCloseVar)), 5),
+          high: this.round(Math.max(source[j].high, Math.max(haOpenVar, haCloseVar)), 5),
           bull: haCloseVar > haOpenVar,
           bear: haCloseVar < haOpenVar,
         });
@@ -259,17 +260,7 @@ export class UtilsService {
     const minutes = "0" + date.getMinutes();
     const second = "0" + date.getSeconds();
     return (
-      day.substr(-2) +
-      "/" +
-      month.substr(-2) +
-      "/" +
-      year +
-      " " +
-      hours.substr(-2) +
-      ":" +
-      minutes.substr(-2) +
-      ":" +
-      second.substr(-2)
+      day.substr(-2) + "/" + month.substr(-2) + "/" + year + " " + hours.substr(-2) + ":" + minutes.substr(-2) + ":" + second.substr(-2)
     );
   }
 
