@@ -27,8 +27,6 @@ class App extends CandleAbstract {
   snapshot: any;
   tmpBuffer = [];
   ratio2p5: any;
-  orderInfo: any;
-  kline: any;
   entryPrice: number;
   stoploss: number;
   tf: string;
@@ -114,12 +112,13 @@ class App extends CandleAbstract {
       if (res.stream === "btcusdt@depth") {
         this.tmpBuffer.push(res);
       } else if (res.stream === "btcusdt@kline_1m") {
-        if (this.inLong && res.data.k.c <= this.stoploss) {
+        const price = res.data.k.c;
+        if (this.inLong && price <= this.stoploss) {
           this.inLong = false;
-          this.onStoplossHit();
-        } else if (this.inShort && res.data.k.c >= this.stoploss) {
+          this.onStoplossHit(price);
+        } else if (this.inShort && price >= this.stoploss) {
           this.inShort = false;
-          this.onStoplossHit();
+          this.onStoplossHit(price);
         }
       }
     };
@@ -158,11 +157,12 @@ class App extends CandleAbstract {
   /**
    * Update si stoploss touché
    */
-  onStoplossHit() {
-    this.loseTrades.push(-1);
-    this.toDataBase ? this.utils.updateFirebaseResults(-1, this.databasePath) : "";
+  onStoplossHit(price: number) {
+    const rr = this.utils.getRiskReward(this.entryPrice, this.stoploss, price);
+    this.loseTrades.push(rr);
+    this.toDataBase ? this.utils.updateFirebaseResults(rr, this.databasePath) : "";
     /*this.sendTelegramMsg(this.telegramBot, this.config.chatId, this.utils.formatTelegramMsg()); */
-    console.log("Cloture", this.kline.c);
+    console.log("Cloture", price);
     console.log(
       "RR : -1 | Total ",
       this.utils.round(this.utils.arraySum(this.winTrades.concat(this.loseTrades)), 2),
