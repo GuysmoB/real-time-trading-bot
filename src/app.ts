@@ -34,7 +34,7 @@ class App extends CandleAbstract {
   haOhlc = [];
   telegramBot: any;
   databasePath: string;
-  toDataBase = true;
+  toDataBase = false;
 
   constructor(
     private utils: UtilsService,
@@ -111,7 +111,7 @@ class App extends CandleAbstract {
       const res = JSON.parse(event.data);
       if (res.stream === "btcusdt@depth") {
         this.tmpBuffer.push(res);
-      } else if (res.stream === "btcusdt@kline_1m") {
+      } /* else if (res.stream === "btcusdt@kline_1m") {
         const price = res.data.k.c;
         if (this.inLong && price <= this.stoploss) {
           this.inLong = false;
@@ -120,7 +120,7 @@ class App extends CandleAbstract {
           this.inShort = false;
           this.onStoplossHit(price);
         }
-      }
+      } */
     };
 
     ws.onclose = (e) => {
@@ -162,9 +162,9 @@ class App extends CandleAbstract {
     this.loseTrades.push(rr);
     this.toDataBase ? this.utils.updateFirebaseResults(rr, this.databasePath) : "";
     /*this.sendTelegramMsg(this.telegramBot, this.config.chatId, this.utils.formatTelegramMsg()); */
-    console.log("Cloture", price);
+    console.log("Stoploss hit | Price : " + price);
     console.log(
-      "RR : -1 | Total ",
+      "RR : " + rr + " | Total ",
       this.utils.round(this.utils.arraySum(this.winTrades.concat(this.loseTrades)), 2),
       "|",
       this.utils.getDate()
