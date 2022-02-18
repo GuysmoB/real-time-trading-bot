@@ -25,6 +25,7 @@ class App extends CandleAbstract {
   ticker: string;
   accountInfo: any;
   snapshot: any;
+  currentPrice: number;
   tmpBuffer = [];
   ratio2p5: any;
   entryPrice: number;
@@ -80,7 +81,8 @@ class App extends CandleAbstract {
     this.utils.checkArg(this.ticker, this.tf, this.allTickers, this.allTf);
     this.toDataBase ? this.utils.initFirebase(this.databasePath) : "";
     this.telegramBot = new TelegramBot(this.config.token, { polling: false });
-    this.getWebSocketData("wss://fstream.binance.com/stream?streams=btcusdt@depth/btcusdt@kline_1m"); //futurs
+    this.getBinanceStreamData("wss://fstream.binance.com/stream?streams=btcusdt@depth"); //futurs
+    this.getWootradeStreamData(this.config.wsMarketDataUrl + this.config.appId);
   }
 
   /**
@@ -88,45 +90,82 @@ class App extends CandleAbstract {
    */
   async main() {
     this.manageOb();
-    const allData = await this.apiService.getDataFromApi(this.urlPath);
-    this.ohlc = allData.data.slice();
+    const allData = await this.apiService.getKline(); //this.apiService.getDataFromApi(this.urlPath);
+    //const allData = await this.apiService.getDataFromApi(this.urlPath);
+    this.ohlc = allData.rows.reverse();
     this.haOhlc = this.utils.setHeikenAshiData(this.ohlc);
     this.bullOrBear();
   }
 
   /**
-   * Ecoute le WS.
+   * Ecoute le WS Binance.
    */
-  async getWebSocketData(url: string) {
+  async getBinanceStreamData(url: string) {
     this.snapshot = await this.apiService.getObSnapshot();
     this.snapshot.bids = this.utils.convertArrayToNumber(this.snapshot.bids);
     this.snapshot.asks = this.utils.convertArrayToNumber(this.snapshot.asks);
     let ws = new WebSocket(url);
 
     ws.onopen = () => {
-      console.log("Socket is connected. Listenning data ...");
+      console.log("Socket is connected to Binance. Listenning data ...");
     };
 
     ws.onmessage = (event: any) => {
       const res = JSON.parse(event.data);
       if (res.stream === "btcusdt@depth") {
         this.tmpBuffer.push(res);
-      } /* else if (res.stream === "btcusdt@kline_1m") {
-        const price = res.data.k.c;
-        if (this.inLong && price <= this.stoploss) {
-          this.inLong = false;
-          this.onStoplossHit(price);
-        } else if (this.inShort && price >= this.stoploss) {
-          this.inShort = false;
-          this.onStoplossHit(price);
-        }
-      } */
+      }
     };
 
     ws.onclose = (e) => {
       console.log("Socket is closed. Reconnect will be attempted in 1 second.", e.reason);
       setTimeout(() => {
-        this.getWebSocketData(url);
+        this.getBinanceStreamData(url);
+      }, 1000);
+      this.sendTelegramMsg(this.telegramBot, this.config.chatId, "Reconnecting ...");
+    };
+
+    ws.onerror = (err: any) => {
+      console.error("Socket encountered error: ", err.message, "Closing socket");
+      ws.close();
+    };
+  }
+
+  /**
+   * Ecoute le WS Wootrade.
+   */
+  async getWootradeStreamData(url: string) {
+    let ws = new WebSocket(url);
+
+    ws.onopen = () => {
+      console.log("Socket is connected to Wootrade. Listenning data ...");
+      const msg = {
+        id: "clientID6",
+        topic: "SPOT_BTC_USDT@kline_1m",
+        event: "subscribe",
+      };
+      ws.send(JSON.stringify(msg));
+    };
+
+    ws.onmessage = (event: any) => {
+      const res = JSON.parse(event.data);
+      //console.log("res", res);
+      if (res.topic === "SPOT_BTC_USDT@kline_1m") {
+        this.currentPrice = res.data.close;
+        if (this.inLong && this.currentPrice <= this.stoploss) {
+          this.inLong = false;
+          this.onStoplossHit(this.currentPrice);
+        } else if (this.inShort && this.currentPrice >= this.stoploss) {
+          this.inShort = false;
+          this.onStoplossHit(this.currentPrice);
+        }
+      }
+    };
+
+    ws.onclose = (e) => {
+      console.log("Socket is closed. Reconnect will be attempted in 1 second.", e.reason);
+      setTimeout(() => {
+        this.getWootradeStreamData(url);
       }, 1000);
       this.sendTelegramMsg(this.telegramBot, this.config.chatId, "Reconnecting ...");
     };
@@ -177,20 +216,20 @@ class App extends CandleAbstract {
    */
   bullOrBear() {
     const i = this.ohlc.length - 2; // derniere candle cloturée
-
+    //console.log("bull bear candle", this.ohlc[i]);
     if (this.stopConditions(i)) {
-      const rr = this.utils.getRiskReward(this.entryPrice, this.stoploss, this.ohlc[i].close);
+      const rr = this.utils.getRiskReward(this.entryPrice, this.stoploss, this.currentPrice);
       if (rr >= 0) {
         this.winTrades.push(rr);
       } else if (rr < 0) {
         this.loseTrades.push(rr);
       }
 
-      this.inLong ? (this.inLong = false) : this.inLong;
-      this.inShort ? (this.inShort = false) : this.inShort;
-      this.toDataBase ? this.utils.updateFirebaseResults(rr, this.databasePath) : "";
+      if (this.inLong) this.inLong = false;
+      if (this.inShort) this.inShort = false;
+      if (this.toDataBase) this.utils.updateFirebaseResults(rr, this.databasePath);
       /*this.sendTelegramMsg(this.telegramBot, this.config.chatId, this.formatTelegramMsg()); */
-      console.log("Cloture", this.ohlc[i].open);
+      console.log("Cloture", this.currentPrice);
       console.log(
         "RR : " + rr + " | Total ",
         this.utils.round(this.utils.arraySum(this.winTrades.concat(this.loseTrades)), 2),
@@ -204,7 +243,7 @@ class App extends CandleAbstract {
       const resLong = this.stratService.bullStrategy(this.haOhlc, this.ohlc, i, this.ratio2p5);
       if (resLong.startTrade) {
         this.inLong = true;
-        this.entryPrice = resLong.entryPrice;
+        this.entryPrice = this.currentPrice;
         this.stoploss = resLong.stopLoss;
         console.log("Entry long setup", this.utils.getDate());
         console.log("EntryPrice", this.entryPrice);
@@ -213,7 +252,7 @@ class App extends CandleAbstract {
         const resShort = this.stratService.bearStrategy(this.haOhlc, this.ohlc, i, this.ratio2p5);
         if (resShort.startTrade) {
           this.inShort = true;
-          this.entryPrice = resShort.entryPrice;
+          this.entryPrice = this.currentPrice;
           this.stoploss = resShort.stopLoss;
           console.log("Entry short setup", this.utils.getDate());
           console.log("EntryPrice", this.entryPrice);
