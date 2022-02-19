@@ -1,15 +1,13 @@
 import firebase from "firebase";
-import fs from "fs";
 
 export class UtilsService {
-  constructor() {}
+  constructor() { }
 
   /**
    * Permet de retourner le R:R
    */
   getRiskReward(entryPrice: number, stopLoss: number, closedPrice: number): number {
-    const rr = this.round((closedPrice - entryPrice) / (entryPrice - stopLoss), 2);
-    return rr <= -1 ? -1 : rr;
+    return this.round((closedPrice - entryPrice) / (entryPrice - stopLoss), 2);
   }
 
   /**
@@ -324,6 +322,18 @@ export class UtilsService {
       }
     } catch (error) {
       throw new Error("Error initFirebase()" + error);
+    }
+  }
+
+
+  /**
+   * Envoie une notification à Télégram.
+   */
+  sendTelegramMsg(telegramBotObject: any, chatId: string, msg: string) {
+    try {
+      telegramBotObject.sendMessage(chatId, msg);
+    } catch (err) {
+      console.log("Something went wrong when trying to send a Telegram notification", err);
     }
   }
 }

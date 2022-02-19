@@ -20,17 +20,15 @@ class App extends CandleAbstract {
   inShort = false;
   allTickers = ["BTC"];
   allTf = ["1", "5"];
-  urlPath: string;
-  countdown: any;
   ticker: string;
-  accountInfo: any;
+  tf: string;
   snapshot: any;
-  currentPrice: number;
+  ask: number;
+  bid: number;
   tmpBuffer = [];
   ratio2p5: any;
   entryPrice: number;
   stoploss: number;
-  tf: string;
   ohlc = [];
   haOhlc = [];
   telegramBot: any;
@@ -41,16 +39,9 @@ class App extends CandleAbstract {
     private utils: UtilsService,
     private stratService: StrategiesService,
     private config: Config,
-    private indicators: IndicatorsService,
     private apiService: ApiService
   ) {
     super();
-    firebase.initializeApp(config.firebaseConfig);
-    this.telegramBot = new TelegramBot(config.token, { polling: false });
-    this.ticker = process.argv.slice(2)[0];
-    this.tf = process.argv.slice(2)[1];
-    this.urlPath = "https://" + this.ticker + ".history.hxro.io/" + this.tf + "m";
-    this.databasePath = "/woo-" + this.ticker + this.tf;
     this.initApp();
 
     let lastTime: number;
@@ -78,7 +69,11 @@ class App extends CandleAbstract {
   async initApp() {
     console.log("App started |", this.utils.getDate());
     process.title = "main";
+    firebase.initializeApp(config.firebaseConfig);
+    this.ticker = process.argv.slice(2)[0];
+    this.tf = process.argv.slice(2)[1];
     this.utils.checkArg(this.ticker, this.tf, this.allTickers, this.allTf);
+    this.databasePath = "/woo-" + this.ticker + this.tf;
     this.toDataBase ? this.utils.initFirebase(this.databasePath) : "";
     this.telegramBot = new TelegramBot(this.config.token, { polling: false });
     this.getBinanceStreamData("wss://fstream.binance.com/stream?streams=btcusdt@depth"); //futurs
@@ -90,8 +85,7 @@ class App extends CandleAbstract {
    */
   async main() {
     this.manageOb();
-    const allData = await this.apiService.getKline(); //this.apiService.getDataFromApi(this.urlPath);
-    //const allData = await this.apiService.getDataFromApi(this.urlPath);
+    const allData = await this.apiService.getKline();
     this.ohlc = allData.rows.reverse();
     this.haOhlc = this.utils.setHeikenAshiData(this.ohlc);
     this.bullOrBear();
@@ -122,7 +116,7 @@ class App extends CandleAbstract {
       setTimeout(() => {
         this.getBinanceStreamData(url);
       }, 1000);
-      this.sendTelegramMsg(this.telegramBot, this.config.chatId, "Reconnecting ...");
+      this.utils.sendTelegramMsg(this.telegramBot, this.config.chatId, "Reconnecting ...");
     };
 
     ws.onerror = (err: any) => {
@@ -141,23 +135,24 @@ class App extends CandleAbstract {
       console.log("Socket is connected to Wootrade. Listenning data ...");
       const msg = {
         id: "clientID6",
-        topic: "SPOT_BTC_USDT@kline_1m",
+        topic: "SPOT_BTC_USDT@bbo",
         event: "subscribe",
       };
       ws.send(JSON.stringify(msg));
+
+      setInterval(async () => {
+        ws.send(JSON.stringify({ event: "ping" }));
+      }, 10 * 1000);
     };
 
     ws.onmessage = (event: any) => {
       const res = JSON.parse(event.data);
-      //console.log("res", res);
-      if (res.topic === "SPOT_BTC_USDT@kline_1m") {
-        this.currentPrice = res.data.close;
-        if (this.inLong && this.currentPrice <= this.stoploss) {
-          this.inLong = false;
-          this.onStoplossHit(this.currentPrice);
-        } else if (this.inShort && this.currentPrice >= this.stoploss) {
-          this.inShort = false;
-          this.onStoplossHit(this.currentPrice);
+      if (res.topic === "SPOT_BTC_USDT@bbo") {
+        this.ask = res.data.ask;
+        this.bid = res.data.bid;
+        if ((this.inLong && this.bid <= this.stoploss) || (this.inShort && this.ask >= this.stoploss)) {
+          console.log("Stoploss hit");
+          this.onTradeClosed();
         }
       }
     };
@@ -167,7 +162,7 @@ class App extends CandleAbstract {
       setTimeout(() => {
         this.getWootradeStreamData(url);
       }, 1000);
-      this.sendTelegramMsg(this.telegramBot, this.config.chatId, "Reconnecting ...");
+      this.utils.sendTelegramMsg(this.telegramBot, this.config.chatId, "Reconnecting ...");
     };
 
     ws.onerror = (err: any) => {
@@ -193,15 +188,33 @@ class App extends CandleAbstract {
     this.ratio2p5 = this.utils.round((delta2p5 / (res2p5.bidVolume + res2p5.askVolume)) * 100, 2);
   }
 
+
   /**
-   * Update si stoploss touché
+   * Fin de trade
    */
-  onStoplossHit(price: number) {
-    const rr = this.utils.getRiskReward(this.entryPrice, this.stoploss, price);
-    this.loseTrades.push(rr);
-    this.toDataBase ? this.utils.updateFirebaseResults(rr, this.databasePath) : "";
-    /*this.sendTelegramMsg(this.telegramBot, this.config.chatId, this.utils.formatTelegramMsg()); */
-    console.log("Stoploss hit | Price : " + price);
+  onTradeClosed() {
+    let rr: number;
+    let closedPrice: number;
+
+    if (this.inLong) {
+      this.inLong = false;
+      rr = this.utils.getRiskReward(this.entryPrice, this.stoploss, this.bid);
+      closedPrice = this.bid;
+    } else if (this.inShort) {
+      this.inShort = false;
+      rr = this.utils.getRiskReward(this.entryPrice, this.stoploss, this.ask);
+      closedPrice = this.ask;
+    }
+
+    if (rr >= 0) {
+      this.winTrades.push(rr);
+    } else if (rr < 0) {
+      this.loseTrades.push(rr);
+    }
+
+    if (this.toDataBase) this.utils.updateFirebaseResults(rr, this.databasePath);
+    /*this.sendTelegramMsg(this.telegramBot, this.config.chatId, this.formatTelegramMsg()); */
+    console.log("Cloture", closedPrice);
     console.log(
       "RR : " + rr + " | Total ",
       this.utils.round(this.utils.arraySum(this.winTrades.concat(this.loseTrades)), 2),
@@ -216,34 +229,16 @@ class App extends CandleAbstract {
    */
   bullOrBear() {
     const i = this.ohlc.length - 2; // derniere candle cloturée
-    //console.log("bull bear candle", this.ohlc[i]);
-    if (this.stopConditions(i)) {
-      const rr = this.utils.getRiskReward(this.entryPrice, this.stoploss, this.currentPrice);
-      if (rr >= 0) {
-        this.winTrades.push(rr);
-      } else if (rr < 0) {
-        this.loseTrades.push(rr);
-      }
 
-      if (this.inLong) this.inLong = false;
-      if (this.inShort) this.inShort = false;
-      if (this.toDataBase) this.utils.updateFirebaseResults(rr, this.databasePath);
-      /*this.sendTelegramMsg(this.telegramBot, this.config.chatId, this.formatTelegramMsg()); */
-      console.log("Cloture", this.currentPrice);
-      console.log(
-        "RR : " + rr + " | Total ",
-        this.utils.round(this.utils.arraySum(this.winTrades.concat(this.loseTrades)), 2),
-        "|",
-        this.utils.getDate()
-      );
-      console.log("------------");
+    if (this.isStopConditions(i)) {
+      this.onTradeClosed();
     }
 
     if (!this.inLong && !this.inShort) {
       const resLong = this.stratService.bullStrategy(this.haOhlc, this.ohlc, i, this.ratio2p5);
       if (resLong.startTrade) {
         this.inLong = true;
-        this.entryPrice = this.currentPrice;
+        this.entryPrice = this.ask;
         this.stoploss = resLong.stopLoss;
         console.log("Entry long setup", this.utils.getDate());
         console.log("EntryPrice", this.entryPrice);
@@ -252,7 +247,7 @@ class App extends CandleAbstract {
         const resShort = this.stratService.bearStrategy(this.haOhlc, this.ohlc, i, this.ratio2p5);
         if (resShort.startTrade) {
           this.inShort = true;
-          this.entryPrice = this.currentPrice;
+          this.entryPrice = this.bid;
           this.stoploss = resShort.stopLoss;
           console.log("Entry short setup", this.utils.getDate());
           console.log("EntryPrice", this.entryPrice);
@@ -262,18 +257,9 @@ class App extends CandleAbstract {
     }
   }
 
-  /**
-   * Envoie une notification à Télégram.
-   */
-  sendTelegramMsg(telegramBotObject: any, chatId: string, msg: string) {
-    try {
-      telegramBotObject.sendMessage(chatId, msg);
-    } catch (err) {
-      console.log("Something went wrong when trying to send a Telegram notification", err);
-    }
-  }
 
-  stopConditions(i: number): boolean {
+
+  isStopConditions(i: number): boolean {
     return (this.inLong && this.haOhlc[i].bear) || (this.inShort && this.haOhlc[i].bull) ? true : false;
   }
 }
