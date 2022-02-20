@@ -270,6 +270,5 @@ new App(
   utilsService,
   new StrategiesService(utilsService),
   config,
-  new IndicatorsService(utilsService),
   new ApiService(utilsService, config)
 );
