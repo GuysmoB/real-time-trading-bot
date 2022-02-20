@@ -137,12 +137,6 @@ export class UtilsService {
     return snapshot;
   }
 
-  /**
-   * Prend en compte les fees de Hxro
-   */
-  addFees(gain: number) {
-    return gain - gain * 0.03;
-  }
 
   /**
    * Permet d'arrêter le processus.
