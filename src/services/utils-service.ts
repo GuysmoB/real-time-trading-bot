@@ -1,7 +1,7 @@
 import firebase from "firebase";
 
 export class UtilsService {
-  constructor() { }
+  constructor() {}
 
   /**
    * Permet de retourner le R:R
@@ -113,7 +113,11 @@ export class UtilsService {
   /**
    * Mets à jour l'orderbook avec les données du buffer
    */
-  obUpdate(buffer: Number[][], snapshot: Number[][]) {
+  obUpdate(buffer: any[][], snapshot: any[][], limit: number) {
+    const price = snapshot[0][0];
+    const bidLimitDepthPrice = price - price * (limit / 100);
+    const askLimitDepthPrice = price + price * (limit / 100);
+
     try {
       for (let i = 0; i < buffer.length; i++) {
         const price = buffer[i][0];
@@ -130,13 +134,19 @@ export class UtilsService {
           snapshot.push([price, quantity]);
         }
       }
+
+      for (let i = snapshot.length - 1; i >= 0; i--) {
+        const price = snapshot[i][0];
+        if (price <= bidLimitDepthPrice || price >= askLimitDepthPrice) {
+          snapshot.splice(i, 1);
+        }
+      }
     } catch (error) {
       console.log(error);
     }
 
     return snapshot;
   }
-
 
   /**
    * Permet d'arrêter le processus.
@@ -318,7 +328,6 @@ export class UtilsService {
       throw new Error("Error initFirebase()" + error);
     }
   }
-
 
   /**
    * Envoie une notification à Télégram.

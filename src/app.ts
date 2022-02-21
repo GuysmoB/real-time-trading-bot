@@ -1,10 +1,9 @@
-import { ApiService } from "./services/api.service";
 // https://www.digitalocean.com/community/tutorials/setting-up-a-node-project-with-typescript
 // https://github.com/nikvdp/pidcrypt/issues/5#issuecomment-511383690
 // https://github.com/Microsoft/TypeScript/issues/17645#issuecomment-320556012
 
 process.env.NTBA_FIX_319 = "1"; // disable Telegram error
-import { IndicatorsService } from "./services/indicators.service";
+import { ApiService } from "./services/api.service";
 import { CandleAbstract } from "./abstract/candleAbstract";
 import { StrategiesService } from "./services/strategies-service";
 import { UtilsService } from "./services/utils-service";
@@ -48,7 +47,7 @@ class App extends CandleAbstract {
       let minute = new Date().getMinutes();
 
       if (this.tf == "1") {
-        if (second == 10 && second != lastTime) {
+        if (second == 5 && second != lastTime) {
           this.main();
         }
       } else if (this.tf == "5") {
@@ -84,10 +83,10 @@ class App extends CandleAbstract {
   async main() {
     this.manageOb();
     const allData = await this.apiService.getKline();
-    allData.rows.map(x => {
-      x.temps_debut = this.utils.getDate(x.start_timestamp)
-      x.temps_fin = this.utils.getDate(x.end_timestamp)
-    })
+    allData.rows.map((x) => {
+      x.temps_debut = this.utils.getDate(x.start_timestamp);
+      x.temps_fin = this.utils.getDate(x.end_timestamp);
+    });
     this.ohlc = allData.rows.reverse();
     this.haOhlc = this.utils.setHeikenAshiData(this.ohlc);
     this.bullOrBear();
@@ -180,8 +179,8 @@ class App extends CandleAbstract {
     const obRes = this.utils.getBidAskFromBuffer(this.tmpBuffer);
     this.tmpBuffer = [];
 
-    this.snapshot.bids = this.utils.obUpdate(obRes.bids, this.snapshot.bids);
-    this.snapshot.asks = this.utils.obUpdate(obRes.asks, this.snapshot.asks);
+    this.snapshot.bids = this.utils.obUpdate(obRes.bids, this.snapshot.bids, 2.5);
+    this.snapshot.asks = this.utils.obUpdate(obRes.asks, this.snapshot.asks, 2.5);
     this.snapshot.bids.sort((a, b) => b[0] - a[0]);
     this.snapshot.asks.sort((a, b) => a[0] - b[0]);
 
@@ -189,7 +188,6 @@ class App extends CandleAbstract {
     const delta2p5 = this.utils.round(res2p5.bidVolume - res2p5.askVolume, 2);
     this.ratio2p5 = this.utils.round((delta2p5 / (res2p5.bidVolume + res2p5.askVolume)) * 100, 2);
   }
-
 
   /**
    * Fin de trade
@@ -226,21 +224,26 @@ class App extends CandleAbstract {
       if (this.toDataBase) this.utils.updateFirebaseResults(rr, this.databasePath);
       /*this.sendTelegramMsg(this.telegramBot, this.config.chatId, this.formatTelegramMsg()); */
       console.log("Cloture", closedPrice);
-      console.log("RR : " + rr + " | Total ", this.utils.round(this.utils.arraySum(this.winTrades.concat(this.loseTrades)), 2),
-        "|", this.utils.getDate());
+      console.log(
+        "RR : " + rr + " | Total ",
+        this.utils.round(this.utils.arraySum(this.winTrades.concat(this.loseTrades)), 2),
+        "|",
+        this.utils.getDate()
+      );
       console.log("------------");
     }
   }
-
 
   /**
    * Check for setup on closed candles
    */
   bullOrBear() {
     const i = this.ohlc.length - 2; // derniere candle cloturée
-    console.log('candle cloturée', this.ohlc[i])
-    console.log('candle cloturée ha', this.haOhlc[i])
-    if (this.inLong || this.inShort) { this.checkTradeResult(i); }
+    /* console.log('candle cloturée', this.ohlc[i])
+    console.log('candle cloturée ha', this.haOhlc[i]) */
+    if (this.inLong || this.inShort) {
+      this.checkTradeResult(i);
+    }
 
     if (!this.inLong && !this.inShort) {
       const resLong = this.stratService.bullStrategy(this.haOhlc, this.ohlc, i, this.ratio2p5);
@@ -265,23 +268,16 @@ class App extends CandleAbstract {
     }
   }
 
-
-
   isStopConditions(i: number): boolean {
-    return (
-      (this.inLong && this.ohlc[i].low <= this.stoploss) ||
+    return (this.inLong && this.ohlc[i].low <= this.stoploss) ||
       (this.inShort && this.ohlc[i].high >= this.stoploss) ||
       (this.inLong && this.haOhlc[i].bear) ||
       (this.inShort && this.haOhlc[i].bull)
-    ) ? true : false;
+      ? true
+      : false;
   }
 }
 
 const utilsService = new UtilsService();
 const config = new Config();
-new App(
-  utilsService,
-  new StrategiesService(utilsService),
-  config,
-  new ApiService(utilsService, config)
-);
+new App(utilsService, new StrategiesService(utilsService), config, new ApiService(utilsService, config));
