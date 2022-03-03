@@ -1,8 +1,7 @@
 export class Config {
-  appId = "6f80d617-3608-41de-808b-96d7ee2de49b";
-  xApiKey = "QTzYlhrRJgimiWjjXmWMww==";
-  xApiSecret = "Z3U3GMH2XY6DZCYSDC52AI5RHO2Q";
-  baseUrl = "https://api.woo.org";
+  xApiKey = "y0l-KRXUdw8Qc4HooSFPFimzG7KQjtxUMQw072zI";
+  xApiSecret = "QwEtMHmCKvmAkPA006JvIJFfyagL_LeWBSODavYt";
+  baseUrl = "https://ftx.com/api";
   wsMarketDataUrl = "wss://wss.woo.org/ws/stream/";
   wsUserDataUrl = "wss://wss.woo.org/v2/ws/private/stream/";
   token = "1909550597:AAGd1H7WU7ZNrW8zhZFy0iQs7RGr6jPl448";

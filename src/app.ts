@@ -11,6 +11,7 @@ import { Config } from "./config";
 import firebase from "firebase";
 import TelegramBot from "node-telegram-bot-api";
 import WebSocket from "ws";
+import { RestClient } from "ftx-api/lib/rest-client";
 
 class App extends CandleAbstract {
   winTrades = [];
@@ -31,6 +32,7 @@ class App extends CandleAbstract {
   telegramBot: any;
   databasePath: string;
   toDataBase = false;
+  client: any;
 
   constructor(
     private utils: UtilsService,
@@ -40,7 +42,7 @@ class App extends CandleAbstract {
   ) {
     super();
     this.initApp();
-
+    this.main();
     let lastTime: number;
     setInterval(async () => {
       let second = new Date().getSeconds();
@@ -73,6 +75,7 @@ class App extends CandleAbstract {
     this.databasePath = "/woo-" + this.ticker + this.tf;
     this.toDataBase ? this.utils.initFirebase(this.databasePath) : "";
     this.telegramBot = new TelegramBot(this.config.token, { polling: false });
+    this.client = new RestClient(config.xApiKey, config.xApiSecret);
     this.getBinanceStreamData("wss://fstream.binance.com/stream?streams=btcusdt@depth"); //futurs
     //this.getWootradeStreamData(this.config.wsMarketDataUrl + this.config.appId);
   }
@@ -81,15 +84,15 @@ class App extends CandleAbstract {
    * Gère la logique principale
    */
   async main() {
-    this.manageOb();
-    const allData = await this.apiService.getKline();
-    allData.rows.map((x) => {
-      x.temps_debut = this.utils.getDate(x.start_timestamp);
-      x.temps_fin = this.utils.getDate(x.end_timestamp);
-    });
-    this.ohlc = allData.rows.reverse();
-    this.haOhlc = this.utils.setHeikenAshiData(this.ohlc);
-    this.bullOrBear();
+    try {
+      //this.manageOb();
+      const allData = await this.client.getHistoricalPrices({ market_name: "BTC/USDT", resolution: "60" });
+      this.ohlc = allData.result.reverse();
+      this.haOhlc = this.utils.setHeikenAshiData(this.ohlc);
+      this.bullOrBear();
+    } catch (e) {
+      console.error("public get method failed: ", e);
+    }
   }
 
   /**

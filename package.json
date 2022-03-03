@@ -24,6 +24,7 @@
     "crypto-js": "^4.1.1",
     "file-system": "^2.2.2",
     "firebase": "^8.0.2",
+    "ftx-api": "^1.1.7",
     "ig-api": "^0.15.0",
     "node-ig-api": "^2.0.4",
     "node-telegram-bot-api": "^0.50.0",
