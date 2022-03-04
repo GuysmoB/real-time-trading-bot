@@ -11,6 +11,13 @@ export class UtilsService {
   }
 
   /**
+   * Permet de retourner le R:R
+   */
+  getPercentageResult(entryPrice: number, stopLoss: number, closedPrice: number): number {
+    return this.round((closedPrice - entryPrice) / (entryPrice - stopLoss), 2);
+  }
+
+  /**
    * Mets en forme le msg telegram
    */
   formatTelegramMsg(loseTrades: any, winTrades: any) {
