@@ -32,6 +32,7 @@ class App extends CandleAbstract {
   databasePath: string;
   toDataBase = false;
   ftxApi: any;
+  lastMinute: number;
 
   constructor(
     private utils: UtilsService,
@@ -41,14 +42,17 @@ class App extends CandleAbstract {
   ) {
     super();
     this.initApp();
-    this.main();
+    //this.main();
     let lastTime: number;
     setInterval(async () => {
+      let date = Date.now();
       let second = new Date().getSeconds();
       let minute = new Date().getMinutes();
 
       if (this.tf == "1") {
         if (second == 5 && second != lastTime) {
+          this.lastMinute = Math.floor(Date.now() / 1000 / 60) - 1;
+          console.log("minute TS", this.lastMinute);
           this.main();
         }
       } else if (this.tf == "5") {
@@ -85,8 +89,8 @@ class App extends CandleAbstract {
     try {
       //this.manageOb();
       //const allData = await this.apiService.getDataFromApi("https://BTC.history.hxro.io/1m");
-      console.log(await this.ftxApi.getLeveragedTokenInfo("BULL"));
-      const allData = await this.ftxApi.getHistoricalPrices({ market_name: "BTC/USDT", resolution: "60" });
+      //console.log(await this.ftxApi.getLeveragedTokenInfo("BULL"));
+      const allData = await this.ftxApi.getHistoricalPrices({ market_name: "BULL/USDT", resolution: "60" });
       this.ohlc = allData.result;
       //this.ohlc = allData.data.slice();
       this.haOhlc = this.utils.setHeikenAshiData(this.ohlc);
@@ -191,7 +195,15 @@ class App extends CandleAbstract {
    * Check for setup on closed candles
    */
   bullOrBear() {
-    const i = this.ohlc.length - 2; // derniere candle cloturée
+    for (let i = this.ohlc.length - 1; i >= 0; i--) {
+      if (this.lastMinute && this.ohlc[i].time / 1000 / 60 > this.lastMinute) {
+        console.log("candle remove", this.ohlc[i]);
+        this.ohlc.splice(i, 1);
+      } else {
+        break;
+      }
+    }
+    const i = this.ohlc.length - 1; // derniere candle cloturée
     console.log("candle cloturée", this.ohlc[i]);
 
     if (this.inLong) this.checkTradeResult(i);
