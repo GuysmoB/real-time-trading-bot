@@ -1,7 +1,7 @@
 import firebase from "firebase";
 
 export class UtilsService {
-  constructor() {}
+  constructor() { }
 
   /**
    * Permet de retourner le R:R
@@ -11,10 +11,10 @@ export class UtilsService {
   }
 
   /**
-   * Permet de retourner le R:R
+   * Permet de retourner le pourcentage profit
    */
-  getPercentageResult(entryPrice: number, stopLoss: number, closedPrice: number): number {
-    return this.round((closedPrice - entryPrice) / (entryPrice - stopLoss), 2);
+  getPercentageResult(entryPrice: number, closedPrice: number): number {
+    return this.round((((closedPrice - entryPrice) / entryPrice) - 0.07) / 100, 2);
   }
 
   /**

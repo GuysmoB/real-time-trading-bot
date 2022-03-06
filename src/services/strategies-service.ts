@@ -19,8 +19,8 @@ export class StrategiesService extends CandleAbstract {
 
     return {
       startTrade: cond && haOhlc[i].bull /* && ratio >= 0 */,
-      stopLoss: haOhlc[i].low + 5,
-      entryPrice: this.close(data, i, 0) + 5,
+      stopLoss: haOhlc[i].low,
+      entryPrice: this.close(data, i, 0),
     };
   }
 
@@ -35,8 +35,8 @@ export class StrategiesService extends CandleAbstract {
 
     return {
       startTrade: cond && haOhlc[i].bear /*  && ratio < 0 */,
-      stopLoss: haOhlc[i].high - 5,
-      entryPrice: this.close(data, i, 0) - 5,
+      stopLoss: haOhlc[i].high,
+      entryPrice: this.close(data, i, 0),
     };
   }
 }
