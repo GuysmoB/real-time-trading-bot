@@ -13,7 +13,9 @@ import TelegramBot from "node-telegram-bot-api";
 import WebSocket from "ws";
 import { RestClient } from "ftx-api/lib/rest-client";
 import { WebsocketClient } from "ftx-api/lib/websocket-client";
+import { DefaultLogger } from "ftx-api/lib/logger";
 import { isWsTradesEvent } from "ftx-api/lib/util/typeGuards";
+
 
 class App extends CandleAbstract {
   winTrades = [];
@@ -29,7 +31,9 @@ class App extends CandleAbstract {
   entryPrice: number;
   stoploss: number;
   ohlc = [];
+  ohlc_tmp: any;
   haOhlc = [];
+  streamData: any /* { ts: 0, price: 0 } */;
   telegramBot: any;
   databasePath: string;
   toDataBase = false;
@@ -49,14 +53,25 @@ class App extends CandleAbstract {
 
     let lastTime: number;
     setInterval(async () => {
-      let date = Date.now();
       let second = new Date().getSeconds();
       let minute = new Date().getMinutes();
 
       if (this.tf == "1") {
-        if (second == 5 && second != lastTime) {
-          this.lastMinute = Math.floor(Date.now() / 1000 / 60) - 1;
-          //console.log("minute TS", this.lastMinute);
+        if (second == 0 && second != lastTime && this.streamData.price) {
+          if (this.ohlc_tmp) {
+            this.ohlc_tmp.close = this.streamData.price;
+            this.ohlc.push(this.ohlc_tmp);
+            console.log("ohlc pushed", this.ohlc[this.ohlc.length - 1], this.ohlc.length);
+          }
+
+          this.ohlc_tmp = {
+            time: Date.now(),
+            date: utils.getDate(Date.now()),
+            open: this.streamData.price,
+            high: this.streamData.price,
+            low: this.streamData.price,
+          };
+
           this.main();
         }
       } else if (this.tf == "5") {
@@ -83,9 +98,13 @@ class App extends CandleAbstract {
     this.toDataBase ? this.utils.initFirebase(this.databasePath) : "";
     this.telegramBot = new TelegramBot(this.config.token, { polling: false });
     this.ftxApi = new RestClient(config.xApiKey, config.xApiSecret);
-    this.ftxWs = new WebsocketClient({ key: config.xApiKey, secret: config.xApiSecret });
-    this.getBinanceStreamData("wss://fstream.binance.com/stream?streams=btcusdt@depth"); //futurs
-    this.getFtxStreamData()
+    DefaultLogger.info = () => { };
+    DefaultLogger.debug = () => { };
+    this.ftxWs = new WebsocketClient({ key: config.xApiKey, secret: config.xApiSecret }, DefaultLogger);
+    //this.getBinanceStreamData("wss://fstream.binance.com/stream?streams=btcusdt@depth"); //futurs
+    this.getFtxStreamData();
+    const data = await this.ftxApi.getHistoricalPrices({ market_name: "BULL/USDT", resolution: "60" });
+    this.ohlc = data.result;
   }
 
   /**
@@ -94,13 +113,10 @@ class App extends CandleAbstract {
   async main() {
     try {
       //this.manageOb();
-      //const allData = await this.apiService.getDataFromApi("https://BTC.history.hxro.io/1m");
-      //console.log(await this.ftxApi.getLeveragedTokenInfo("BULL"));
-      const allData = await this.ftxApi.getHistoricalPrices({ market_name: "BULL/USDT", resolution: "60" });
-      this.ohlc = allData.result;
-      //this.ohlc = allData.data.slice();
+
+
       this.haOhlc = this.utils.setHeikenAshiData(this.ohlc);
-      this.bullOrBear();
+      //this.bullOrBear();
     } catch (e) {
       console.error("Main erreur: ", e);
     }
@@ -141,17 +157,18 @@ class App extends CandleAbstract {
   }
 
   getFtxStreamData() {
-    this.ftxWs.on('response', msg => console.log('response: '));
-    this.ftxWs.on('error', msg => console.log('err: '));
+    this.ftxWs.subscribe({ channel: 'trades', market: 'BULL/USD' });
+    this.ftxWs.on('response', msg => console.log('response: ', msg));
+    this.ftxWs.on('error', msg => console.log('err: ', msg));
     this.ftxWs.on('update', msg => {
       if (isWsTradesEvent(msg)) {
-        console.log('trades event: ', msg);
-      } else {
-        console.log('update: ');
+        this.streamData = msg.data[0];
+        if (this.ohlc_tmp) {
+          if (this.streamData.price > this.ohlc_tmp.high) { this.ohlc_tmp.high = this.streamData.price; }
+          if (this.streamData.price < this.ohlc_tmp.low) { this.ohlc_tmp.low = this.streamData.price; }
+        }
       }
     });
-
-    this.ftxWs.subscribe({ channel: 'trades', market: 'BULL/USDT' });
   }
 
   /**
@@ -215,14 +232,6 @@ class App extends CandleAbstract {
    * Check for setup on closed candles
    */
   bullOrBear() {
-    for (let i = this.ohlc.length - 1; i >= 0; i--) {
-      if (this.lastMinute && this.ohlc[i].time / 1000 / 60 > this.lastMinute) {
-        //console.log("candle remove", this.ohlc[i]);
-        this.ohlc.splice(i, 1);
-      } else {
-        break;
-      }
-    }
     const i = this.ohlc.length - 1; // derniere candle cloturée
     //console.log("candle cloturée", this.ohlc[i]);
 
