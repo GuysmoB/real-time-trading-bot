@@ -1,7 +1,7 @@
 import firebase from "firebase";
 
 export class UtilsService {
-  constructor() { }
+  constructor() {}
 
   /**
    * Permet de retourner le R:R
@@ -14,7 +14,7 @@ export class UtilsService {
    * Permet de retourner le pourcentage profit
    */
   getPercentageResult(entryPrice: number, closedPrice: number): number {
-    return this.round((((closedPrice - entryPrice) / entryPrice) - 0.07) / 100, 2);
+    return this.round((closedPrice - entryPrice) / entryPrice - 0.0007, 4);
   }
 
   /**
@@ -166,7 +166,7 @@ export class UtilsService {
   /**
    * Check la validité des arguments passés à l'app.
    */
-  checkArg(ticker: string, tf: string, allTicker: any, allTf: any) {
+  checkArg(ticker: string, tf: number, allTicker: any, allTf: any) {
     if (!allTicker.includes(ticker) || !allTf.includes(tf)) {
       this.stopProcess("Argument error: " + ticker + " " + tf);
     }

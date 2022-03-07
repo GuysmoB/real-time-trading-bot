@@ -16,15 +16,14 @@ import { WebsocketClient } from "ftx-api/lib/websocket-client";
 import { DefaultLogger } from "ftx-api/lib/logger";
 import { isWsTradesEvent } from "ftx-api/lib/util/typeGuards";
 
-
 class App extends CandleAbstract {
   winTrades = [];
   loseTrades = [];
   inLong = false;
   allTickers = ["BULL", "BEAR"];
-  allTf = ["60"];
+  allTf = [1];
   ticker: string;
-  tf: string;
+  tf: number;
   snapshot: any;
   tmpBuffer = [];
   ratio2p5: any;
@@ -55,9 +54,8 @@ class App extends CandleAbstract {
     let lastTime: number;
     setInterval(async () => {
       let second = new Date().getSeconds();
-      let minute = new Date().getMinutes();
 
-      if (this.tf == "60") {
+      if (this.tf == 1) {
         if (second == 0 && second != lastTime && this.streamData) {
           if (this.ohlc_tmp) {
             this.ohlc_tmp.close = this.streamData.price;
@@ -66,7 +64,7 @@ class App extends CandleAbstract {
           }
 
           if (!this.isHistoricalDataCalled) {
-            const data = await this.ftxApi.getHistoricalPrices({ market_name: `${this.ticker}/USD`, resolution: this.tf });
+            const data = await this.ftxApi.getHistoricalPrices({ market_name: `${this.ticker}/USD`, resolution: `${this.tf * 60}` });
             this.ohlc = data.result;
             this.isHistoricalDataCalled = true;
           }
@@ -95,7 +93,7 @@ class App extends CandleAbstract {
     process.title = "main";
     firebase.initializeApp(config.firebaseConfig);
     this.ticker = process.argv.slice(2)[0];
-    this.tf = process.argv.slice(2)[1];
+    this.tf = +process.argv.slice(2)[1];
     this.utils.checkArg(this.ticker, this.tf, this.allTickers, this.allTf);
     this.databasePath = "/ftx-" + this.ticker + this.tf;
     this.toDataBase ? this.utils.initFirebase(this.databasePath) : "";
@@ -154,18 +152,24 @@ class App extends CandleAbstract {
   }
 
   async getFtxStreamData() {
-    DefaultLogger.info = () => { };
-    DefaultLogger.debug = () => { };
-    this.ftxWs.subscribe({ channel: 'trades', market: `${this.ticker}/USD` });
-    this.ftxWs.on('open', () => { console.log("Socket is connected to FTX. Listenning data ..."); });
-    this.ftxWs.on('response', msg => console.log('response: ', msg));
-    this.ftxWs.on('error', msg => console.log('err: ', msg));
-    this.ftxWs.on('update', msg => {
+    DefaultLogger.info = () => {};
+    DefaultLogger.debug = () => {};
+    this.ftxWs.subscribe({ channel: "trades", market: `${this.ticker}/USD` });
+    this.ftxWs.on("open", () => {
+      console.log("Socket is connected to FTX. Listenning data ...");
+    });
+    this.ftxWs.on("response", (msg) => console.log("response: ", msg));
+    this.ftxWs.on("error", (msg) => console.log("err: ", msg));
+    this.ftxWs.on("update", (msg) => {
       if (isWsTradesEvent(msg)) {
         this.streamData = msg.data[0];
         if (this.ohlc_tmp) {
-          if (this.streamData.price > this.ohlc_tmp.high) { this.ohlc_tmp.high = this.streamData.price; }
-          if (this.streamData.price < this.ohlc_tmp.low) { this.ohlc_tmp.low = this.streamData.price; }
+          if (this.streamData.price > this.ohlc_tmp.high) {
+            this.ohlc_tmp.high = this.streamData.price;
+          }
+          if (this.streamData.price < this.ohlc_tmp.low) {
+            this.ohlc_tmp.low = this.streamData.price;
+          }
         }
       }
     });
@@ -194,15 +198,10 @@ class App extends CandleAbstract {
   checkTradeResult(i: number) {
     let result: number;
 
-    if (this.inLong && this.streamData.price <= this.stoploss) {
-      result = this.utils.getPercentageResult(this.entryPrice, this.streamData.price);
+    if ((this.inLong && this.streamData.price <= this.stoploss) || (this.inLong && this.haOhlc[i].bear)) {
       this.inLong = false;
-      console.log("Stoploss hit");
-    } else {
-      if (this.inLong && this.haOhlc[i].bear) {
-        this.inLong = false;
-        result = this.utils.getPercentageResult(this.entryPrice, this.streamData.price);
-      }
+      result = this.utils.getPercentageResult(this.entryPrice, this.streamData.price);
+      if (this.streamData.price <= this.stoploss) console.log("Stoploss hit");
     }
 
     if (result) {
@@ -212,8 +211,10 @@ class App extends CandleAbstract {
         this.loseTrades.push(result);
       }
 
-      this.balance = this.utils.round(this.balance + (this.balance * result), 2);
-      if (this.toDataBase) { this.utils.updateFirebaseResults(result, this.databasePath); }
+      this.balance = this.utils.round(this.balance + this.balance * result, 2);
+      if (this.toDataBase) {
+        this.utils.updateFirebaseResults(result, this.databasePath);
+      }
       /*this.sendTelegramMsg(this.telegramBot, this.config.chatId, this.formatTelegramMsg()); */
       console.log("Cloture", this.streamData.price);
       console.log("Result% : " + result + " | Total ", this.balance, "|", this.utils.getDate());
@@ -228,7 +229,9 @@ class App extends CandleAbstract {
     const i = this.ohlc.length - 1; // derniere candle cloturée
     //console.log("candle cloturée", this.ohlc[i]);
 
-    if (this.inLong) { this.checkTradeResult(i); }
+    if (this.inLong) {
+      this.checkTradeResult(i);
+    }
     if (!this.inLong) {
       const resLong = this.stratService.bullStrategy(this.haOhlc, this.ohlc, i, this.ratio2p5);
       if (resLong.startTrade) {
