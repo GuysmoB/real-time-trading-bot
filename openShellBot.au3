@@ -7,22 +7,29 @@ AutoItSetOption('PixelCoordMode', 0)
 AutoItSetOption('WinTitleMatchMode', 2)
 HotKeySet("{ESC}", "_Exit")
 
-Global $tf[5] = [1, 2, 3, 4, 5];, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+Global $ticker[2] = ["BULL", "BEAR"]
+Global $tf[2] = [1, 2];, 3, 4, 5];, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
 
-
-For $i In $tf
-	Run("powershell")
-	WinWait("[TITLE:Windows PowerShell]", "", 10)
-	logInfo('ready')
-	Sleep(500)
-	ClipPut("")
-	ClipPut("npm run start BULL " &$i)
-	Send("^v")
-	Send("{ENTER}")
+sendCommande("npm run compile")
+Sleep(10000)
+For $j In $ticker
+	For $i In $tf
+		sendCommande("node dist/app.js " &$j &" " &$i)
+	Next
 Next
 
 
-
+Func sendCommande($commande)
+	Run("powershell")
+	WinWait("[TITLE:Windows PowerShell]", "", 10)
+	Sleep(500)
+	ClipPut("")
+	logInfo($commande)
+	ClipPut($commande)
+	Send("^v")
+	Send("{ENTER}")
+	Sleep(1000)
+EndFunc   ;==>_winActivate
 
 
 ;-----------------------------------------------

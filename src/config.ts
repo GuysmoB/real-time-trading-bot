@@ -1,9 +1,6 @@
 export class Config {
   xApiKey = "y0l-KRXUdw8Qc4HooSFPFimzG7KQjtxUMQw072zI";
   xApiSecret = "QwEtMHmCKvmAkPA006JvIJFfyagL_LeWBSODavYt";
-  baseUrl = "https://ftx.com/api";
-  wsMarketDataUrl = "wss://wss.woo.org/ws/stream/";
-  wsUserDataUrl = "wss://wss.woo.org/v2/ws/private/stream/";
   token = "1909550597:AAGd1H7WU7ZNrW8zhZFy0iQs7RGr6jPl448";
   chatId = "-566798860";
   firebaseConfig = {

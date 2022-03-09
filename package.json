@@ -4,6 +4,7 @@
   "description": "",
   "main": "dist/app.js",
   "scripts": {
+    "compile": "tsc",
     "start": "tsc && node dist/app.js",
     "debug": "tsc && node dist/app.js BULL 1",
     "stop": "pkill --signal SIGINT main",

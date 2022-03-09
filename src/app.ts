@@ -32,11 +32,11 @@ class App extends CandleAbstract {
   streamData: any;
   telegramBot: any;
   databasePath: string;
-  toDataBase = false;
   ftxApi: any;
   ftxWs: any;
   isHistoricalDataCalled: boolean = false;
-  balance = 1000;
+  balance: any;
+  toDataBase = false;
 
   constructor(
     private utils: UtilsService,
@@ -66,16 +66,17 @@ class App extends CandleAbstract {
    */
   async initApp() {
     console.log("App started |", this.utils.getDate());
+    /* this.utils.sendTelegramMsg(this.telegramBot, this.config.chatId, `App started ${this.ticker} ${this.tf}`); */
     process.title = "main";
     firebase.initializeApp(config.firebaseConfig);
     this.ticker = process.argv.slice(2)[0];
     this.tf = +process.argv.slice(2)[1];
     this.utils.checkArg(this.ticker, this.tf, this.allTickers, this.allTf);
     this.databasePath = "/ftx-" + this.ticker + this.tf;
-    this.toDataBase ? this.utils.initFirebase(this.databasePath) : "";
     this.telegramBot = new TelegramBot(this.config.token, { polling: false });
     this.ftxApi = new RestClient(config.xApiKey, config.xApiSecret);
     this.ftxWs = new WebsocketClient({ key: config.xApiKey, secret: config.xApiSecret }, DefaultLogger);
+    this.balance = await this.utils.getBalance(this.toDataBase, this.databasePath);
     this.getFtxStreamData();
   }
 
@@ -124,12 +125,8 @@ class App extends CandleAbstract {
       if (isWsTradesEvent(msg)) {
         this.streamData = msg.data[0];
         if (this.ohlc_tmp) {
-          if (this.streamData.price > this.ohlc_tmp.high) {
-            this.ohlc_tmp.high = this.streamData.price;
-          }
-          if (this.streamData.price < this.ohlc_tmp.low) {
-            this.ohlc_tmp.low = this.streamData.price;
-          }
+          if (this.streamData.price > this.ohlc_tmp.high) this.ohlc_tmp.high = this.streamData.price;
+          if (this.streamData.price < this.ohlc_tmp.low) this.ohlc_tmp.low = this.streamData.price;
         }
 
         if (this.inLong) this.checkTradeResult();
@@ -143,7 +140,7 @@ class App extends CandleAbstract {
   checkTradeResult() {
     let result: number;
 
-    if ((this.inLong && this.streamData.price <= this.stoploss) || (this.inLong && this.haOhlc[this.haOhlc.length - 1].bear)) {
+    if (this.streamData.price <= this.stoploss || this.haOhlc[this.haOhlc.length - 1].bear) {
       this.inLong = false;
       result = this.utils.getPercentageResult(this.entryPrice, this.streamData.price);
       if (this.streamData.price <= this.stoploss) console.log("Stoploss hit");
@@ -157,10 +154,10 @@ class App extends CandleAbstract {
       }
 
       this.balance = this.utils.round(this.balance + this.balance * result, 2);
-      if (this.toDataBase) this.utils.updateFirebaseResults(result, this.databasePath);
-      /*this.sendTelegramMsg(this.telegramBot, this.config.chatId, this.formatTelegramMsg()); */
+      if (this.toDataBase) this.utils.updateFirebaseResults(result, this.balance, this.databasePath);
+      /* this.utils.sendTelegramMsg(this.telegramBot, this.config.chatId, this.utils.formatTelegramMsg(this.loseTrades, this.winTrades, this.balance)); */
       console.log("Cloture", this.streamData.price);
-      console.log("Result% : " + this.utils.round(result * 100, 2) + " | Total ", this.balance, "|", this.utils.getDate());
+      console.log(`Result : ${this.utils.round(result * 100, 2)}% | Balance : ${this.balance}$ | ${this.utils.getDate()}`);
       console.log("------------");
     }
   }
@@ -172,14 +169,16 @@ class App extends CandleAbstract {
     const i = this.ohlc.length - 1; // derniere candle cloturée
     //console.log("candle cloturée", this.ohlc[i]);
 
-    const resLong = this.stratService.bullStrategy(this.haOhlc, this.ohlc, i, this.ratio2p5);
-    if (resLong.startTrade) {
-      this.inLong = true;
-      this.entryPrice = this.streamData.price;
-      this.stoploss = resLong.stopLoss;
-      console.log("Entry long setup", this.utils.getDate());
-      console.log("EntryPrice", this.entryPrice);
-      console.log("StopLoss", this.stoploss);
+    if (!this.inLong) {
+      const resLong = this.stratService.bullStrategy(this.haOhlc, i, this.ratio2p5);
+      if (resLong.startTrade) {
+        this.inLong = true;
+        this.entryPrice = this.streamData.price;
+        this.stoploss = resLong.stopLoss;
+        console.log("Entry long setup", this.utils.getDate());
+        console.log("EntryPrice", this.entryPrice);
+        console.log("StopLoss", this.stoploss);
+      }
     }
   }
 }

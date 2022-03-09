@@ -4,13 +4,6 @@ export class UtilsService {
   constructor() {}
 
   /**
-   * Permet de retourner le R:R
-   */
-  getRiskReward(entryPrice: number, stopLoss: number, closedPrice: number): number {
-    return this.round((closedPrice - entryPrice) / (entryPrice - stopLoss), 2);
-  }
-
-  /**
    * Permet de retourner le pourcentage profit
    */
   getPercentageResult(entryPrice: number, closedPrice: number): number {
@@ -20,139 +13,17 @@ export class UtilsService {
   /**
    * Mets en forme le msg telegram
    */
-  formatTelegramMsg(loseTrades: any, winTrades: any) {
+  formatTelegramMsg(loseTrades: any, winTrades: any, balance: number) {
     return (
       "Total trades : " +
       (winTrades.length + loseTrades.length) +
       "\n" +
-      "Total R:R : " +
-      this.round(loseTrades.reduce((a, b) => a + b, 0) + winTrades.reduce((a, b) => a + b, 0), 2) +
+      "Balance : " +
+      balance +
       "\n" +
       "Winrate : " +
       (this.round((winTrades.length / (loseTrades.length + winTrades.length)) * 100, 2) + "%")
     );
-  }
-
-  /**
-   * Récupère le bid et ask depuis le buffer U = u + 1
-   */
-  getBidAskFromBuffer(tmpBuffer: any) {
-    let bids = [];
-    let asks = [];
-
-    try {
-      for (let i = 0; i < tmpBuffer.length; i++) {
-        const element = tmpBuffer[i].data; //.data pourr les futurs
-
-        /* if (i > 1) {
-            const element1 = tmpBuffer[i - 1].data;
-            if (element.U != element1.u + 1) {
-              throw new Error('u dans le mauvais ordre chrono');
-            }
-          } */
-        bids = [...bids, ...this.convertArrayToNumber(element.b)];
-        asks = [...asks, ...this.convertArrayToNumber(element.a)];
-      }
-    } catch (error) {
-      console.log(error);
-    }
-
-    return {
-      bids,
-      asks,
-    };
-  }
-
-  getVolumeDepth(snapshot: any, depth: number) {
-    const price = snapshot.bids[0][0];
-    const bidLimitDepthPrice = price - price * (depth / 100);
-    const askLimitDepthPrice = price + price * (depth / 100);
-    let bidResult = [];
-    let askResult = [];
-
-    for (const i in snapshot.bids) {
-      const elementPrice = snapshot.bids[i][0];
-      const elementQuantity = snapshot.bids[i][1];
-
-      if (elementPrice < bidLimitDepthPrice) {
-        break;
-      } else {
-        bidResult.push(elementQuantity);
-      }
-    }
-
-    for (const i in snapshot.asks) {
-      const elementPrice = snapshot.asks[i][0];
-      const elementQuantity = snapshot.asks[i][1];
-
-      if (elementPrice > askLimitDepthPrice) {
-        break;
-      } else {
-        askResult.push(elementQuantity);
-      }
-    }
-
-    return {
-      bidQuantity: bidResult,
-      bidVolume: this.round(
-        bidResult.reduce((a, b) => a + b, 0),
-        2
-      ),
-      askQuantity: askResult,
-      askVolume: this.round(
-        askResult.reduce((a, b) => a + b, 0),
-        2
-      ),
-    };
-  }
-
-  /**
-   * Convertis un tableau en []number
-   */
-  convertArrayToNumber(array: any) {
-    for (const i in array) {
-      array[i][0] = +array[i][0];
-      array[i][1] = +array[i][1];
-    }
-    return array;
-  }
-
-  /**
-   * Mets à jour l'orderbook avec les données du buffer
-   */
-  obUpdate(buffer: any[][], snapshot: any[][], limit: number) {
-    const price = snapshot[0][0];
-    const bidLimitDepthPrice = price - price * (limit / 100);
-    const askLimitDepthPrice = price + price * (limit / 100);
-
-    try {
-      for (let i = 0; i < buffer.length; i++) {
-        const price = buffer[i][0];
-        const quantity = buffer[i][1];
-
-        const index = snapshot.findIndex((x) => x[0] == price);
-        if (index >= 0) {
-          if (quantity == 0) {
-            snapshot.splice(index, 1);
-          } else {
-            snapshot[index][1] = quantity;
-          }
-        } else if (index == -1 && quantity != 0) {
-          snapshot.push([price, quantity]);
-        }
-      }
-
-      for (let i = snapshot.length - 1; i >= 0; i--) {
-        const price = snapshot[i][0];
-        if (price <= bidLimitDepthPrice || price >= askLimitDepthPrice) {
-          snapshot.splice(i, 1);
-        }
-      }
-    } catch (error) {
-      console.log(error);
-    }
-
-    return snapshot;
   }
 
   /**
@@ -276,7 +147,7 @@ export class UtilsService {
   /**
    * Insert chaque trade dans Firebase.
    */
-  async updateFirebaseResults($rr: any, databasePath: string) {
+  async updateFirebaseResults($rr: any, $balance: number, databasePath: string) {
     try {
       const res = await this.getFirebaseResults(databasePath);
       if (res) {
@@ -291,7 +162,7 @@ export class UtilsService {
             winTrades: $winTrades,
             loseTrades: $loseTrades,
             totalTrades: res.totalTrades + 1,
-            totalRR: this.round(res.totalRR + $rr, 2),
+            balance: $balance,
             "winrate%": $winrate ? $winrate : 0,
           });
       }
@@ -319,21 +190,28 @@ export class UtilsService {
   /**
    * Initialise Firebase si la rerf n'existe pas.
    */
-  async initFirebase(databasePath: string) {
-    try {
-      const res = await this.getFirebaseResults(databasePath);
-      if (!res) {
-        await firebase.database().ref(databasePath).push({
-          winTrades: 0,
-          loseTrades: 0,
-          totalTrades: 0,
-          totalRR: 0,
-          "winrate%": 0,
-        });
+  async getBalance(toDataBase: boolean, databasePath: string) {
+    let balance = 1000;
+    if (toDataBase) {
+      try {
+        const res = await this.getFirebaseResults(databasePath);
+        if (!res) {
+          await firebase.database().ref(databasePath).push({
+            winTrades: 0,
+            loseTrades: 0,
+            totalTrades: 0,
+            balance: 1000,
+            "winrate%": 0,
+          });
+        } else {
+          balance = res.balance;
+        }
+      } catch (error) {
+        throw new Error("Error initFirebase()" + error);
       }
-    } catch (error) {
-      throw new Error("Error initFirebase()" + error);
     }
+
+    return balance;
   }
 
   /**
