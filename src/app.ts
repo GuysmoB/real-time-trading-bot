@@ -20,7 +20,7 @@ class App extends CandleAbstract {
   loseTrades = [];
   inLong = false;
   allTickers = ["BULL", "BEAR"];
-  allTf = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+  allTf = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]; //15, 60, 300, 900, 3600, 14400,
   ticker: string;
   tf: number;
   ratio2p5: any;
@@ -90,8 +90,8 @@ class App extends CandleAbstract {
         this.ohlc.push(this.ohlc_tmp);
       }
 
-      if (!this.isHistoricalDataCalled) {
-        const data = await this.ftxApi.getHistoricalPrices({ market_name: `${this.ticker}/USD`, resolution: `${this.tf * 60}` });
+      if (!this.isHistoricalDataCalled && this.tf === 1) {
+        const data = await this.ftxApi.getHistoricalPrices({ market_name: `${this.ticker}/USD`, resolution: `${this.tf * 60}` }); // Pour TEST
         this.ohlc = data.result;
         this.isHistoricalDataCalled = true;
       }
@@ -105,8 +105,10 @@ class App extends CandleAbstract {
         low: this.streamData.price,
       };
 
-      this.haOhlc = this.utils.setHeikenAshiData(this.ohlc);
-      this.bullOrBear();
+      if (this.ohlc.length >= 5) {
+        this.haOhlc = this.utils.setHeikenAshiData(this.ohlc); //lookback condition avec OHLC length
+        this.bullOrBear();
+      }
     } catch (e) {
       console.error("Main erreur: ", e);
     }

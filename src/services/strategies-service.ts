@@ -11,7 +11,7 @@ export class StrategiesService extends CandleAbstract {
   bullStrategy(haOhlc: any, i: number, ratio: any): any {
     let cond = true;
     for (let j = i - 1; j >= i - this.lookback; j--) {
-      if (haOhlc[j].bull) {
+      if (haOhlc[j]?.bull) {
         cond = false;
         break;
       }
