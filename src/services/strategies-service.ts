@@ -8,7 +8,7 @@ export class StrategiesService extends CandleAbstract {
     super();
   }
 
-  bullStrategy(haOhlc: any, i: number, ratio: any): any {
+  async bullStrategy(haOhlc: any, i: number, ticker: string, tf: number, ftxApi: any, ratio: any) {
     let cond = true;
     for (let j = i - 1; j >= i - this.lookback; j--) {
       if (haOhlc[j]?.bull) {
@@ -17,8 +17,10 @@ export class StrategiesService extends CandleAbstract {
       }
     }
 
+    const bigHaOhlc = await this.utils.getBigTimeframeHA(ticker, tf, ftxApi);
+
     return {
-      startTrade: cond && haOhlc[i].bull /* && ratio >= 0 */,
+      startTrade: cond && bigHaOhlc[bigHaOhlc.length - 1].bull && haOhlc[i].bull /* && ratio >= 0 */,
       stopLoss: haOhlc[i - 1].low,
     };
   }

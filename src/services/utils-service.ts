@@ -224,6 +224,21 @@ export class UtilsService {
       console.log("Something went wrong when trying to send a Telegram notification", err);
     }
   }
+
+  async getBigTimeframeHA(ticker: string, tf: number, ftxApi: any) {
+    try {
+      let data: any;
+      if (tf < 15) {
+        data = await ftxApi.getHistoricalPrices({ market_name: `${ticker}/USD`, resolution: 14400 }); //4h
+      } else {
+        data = await ftxApi.getHistoricalPrices({ market_name: `${ticker}/USD`, resolution: 86400 }); //1D
+      }
+
+      return Promise.resolve(this.setHeikenAshiData(data.result));
+    } catch (error) {
+      console.error("Erreur", error);
+    }
+  }
 }
 
 export default new UtilsService();

@@ -167,12 +167,12 @@ class App extends CandleAbstract {
   /**
    * Check for setup on closed candles
    */
-  bullOrBear() {
+  async bullOrBear() {
     const i = this.ohlc.length - 1; // derniere candle cloturée
     //console.log("candle cloturée", this.ohlc[i]);
 
     if (!this.inLong) {
-      const resLong = this.stratService.bullStrategy(this.haOhlc, i, this.ratio2p5);
+      const resLong = await this.stratService.bullStrategy(this.haOhlc, i, this.ticker, this.tf, this.ftxApi, this.ratio2p5);
       if (resLong.startTrade) {
         this.inLong = true;
         this.entryPrice = this.streamData.price;
