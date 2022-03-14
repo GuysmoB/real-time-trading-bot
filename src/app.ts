@@ -73,15 +73,13 @@ class App extends CandleAbstract {
     this.databasePath = "/woo-" + this.ticker + this.tf;
     this.toDataBase ? this.utils.initFirebase(this.databasePath) : "";
     this.telegramBot = new TelegramBot(this.config.token, { polling: false });
-    this.getBinanceStreamData("wss://fstream.binance.com/stream?streams=btcusdt@depth"); //futurs
-    //this.getWootradeStreamData(this.config.wsMarketDataUrl + this.config.appId);
+    this.getWootradeStreamData(this.config.wsMarketDataUrl + this.config.appId);
   }
 
   /**
    * Gère la logique principale
    */
   async main() {
-    this.manageOb();
     const allData = await this.apiService.getKline();
     allData.rows.map((x) => {
       x.temps_debut = this.utils.getDate(x.start_timestamp);
@@ -90,40 +88,6 @@ class App extends CandleAbstract {
     this.ohlc = allData.rows.reverse();
     this.haOhlc = this.utils.setHeikenAshiData(this.ohlc);
     this.bullOrBear();
-  }
-
-  /**
-   * Ecoute le WS Binance.
-   */
-  async getBinanceStreamData(url: string) {
-    this.snapshot = await this.apiService.getObSnapshot();
-    this.snapshot.bids = this.utils.convertArrayToNumber(this.snapshot.bids);
-    this.snapshot.asks = this.utils.convertArrayToNumber(this.snapshot.asks);
-    let ws = new WebSocket(url);
-
-    ws.onopen = () => {
-      console.log("Socket is connected to Binance. Listenning data ...");
-    };
-
-    ws.onmessage = (event: any) => {
-      const res = JSON.parse(event.data);
-      if (res.stream === "btcusdt@depth") {
-        this.tmpBuffer.push(res);
-      }
-    };
-
-    ws.onclose = (e) => {
-      console.log("Socket is closed. Reconnect will be attempted in 1 second.", e.reason);
-      setTimeout(() => {
-        this.getBinanceStreamData(url);
-      }, 1000);
-      this.utils.sendTelegramMsg(this.telegramBot, this.config.chatId, "Reconnecting ...");
-    };
-
-    ws.onerror = (err: any) => {
-      console.error("Socket encountered error: ", err.message, "Closing socket");
-      ws.close();
-    };
   }
 
   /**
@@ -170,23 +134,6 @@ class App extends CandleAbstract {
       console.error("Socket encountered error: ", err.message, "Closing socket");
       ws.close();
     };
-  }
-
-  /**
-   * MAJ de l'ob.
-   */
-  async manageOb() {
-    const obRes = this.utils.getBidAskFromBuffer(this.tmpBuffer);
-    this.tmpBuffer = [];
-
-    this.snapshot.bids = this.utils.obUpdate(obRes.bids, this.snapshot.bids, 2.5);
-    this.snapshot.asks = this.utils.obUpdate(obRes.asks, this.snapshot.asks, 2.5);
-    this.snapshot.bids.sort((a, b) => b[0] - a[0]);
-    this.snapshot.asks.sort((a, b) => a[0] - b[0]);
-
-    const res2p5 = this.utils.getVolumeDepth(this.snapshot, 2.5);
-    const delta2p5 = this.utils.round(res2p5.bidVolume - res2p5.askVolume, 2);
-    this.ratio2p5 = this.utils.round((delta2p5 / (res2p5.bidVolume + res2p5.askVolume)) * 100, 2);
   }
 
   /**

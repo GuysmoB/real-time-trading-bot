@@ -50,12 +50,11 @@ export class ApiService {
     } */
   }
 
-  getObSnapshot() {
+  getKlineBinance() {
     return new Promise<any>(async (resolve, reject) => {
       const fetch = require("node-fetch");
 
-      //const url = 'https://api.binance.com/api/v3/depth?symbol=BTCUSDT&limit=5000'; //spot
-      const url = " https://fapi.binance.com/fapi/v1/depth?symbol=BTCUSDT&limit=1000"; //futurs
+      const url = "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=6m"; //spot
       const options = { method: "GET", headers: { Accept: "text/plain" } };
 
       fetch(url, options)
