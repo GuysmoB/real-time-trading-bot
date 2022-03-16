@@ -8,7 +8,7 @@ export class StrategiesService extends CandleAbstract {
     super();
   }
 
-  bullStrategy(haOhlc: any, data: any, i: number, ratio: any): any {
+  bullStrategy(haOhlc: any, i: number, ratio: any): any {
     let cond = true;
     for (let j = i - 1; j >= i - this.lookback; j--) {
       if (haOhlc[j].bull) {
@@ -19,12 +19,11 @@ export class StrategiesService extends CandleAbstract {
 
     return {
       startTrade: cond && haOhlc[i].bull /* && ratio >= 0 */,
-      stopLoss: haOhlc[i].low + 5,
-      entryPrice: this.close(data, i, 0) + 5,
+      stopLoss: haOhlc[i].low,
     };
   }
 
-  bearStrategy(haOhlc: any, data: any, i: number, ratio: any): any {
+  bearStrategy(haOhlc: any, i: number, ratio: any): any {
     let cond = true;
     for (let j = i - 1; j >= i - this.lookback; j--) {
       if (haOhlc[j].bear) {
@@ -35,8 +34,7 @@ export class StrategiesService extends CandleAbstract {
 
     return {
       startTrade: cond && haOhlc[i].bear /*  && ratio < 0 */,
-      stopLoss: haOhlc[i].high - 5,
-      entryPrice: this.close(data, i, 0) - 5,
+      stopLoss: haOhlc[i].high,
     };
   }
 }

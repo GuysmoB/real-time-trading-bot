@@ -37,7 +37,7 @@ export class UtilsService {
   /**
    * Check la validité des arguments passés à l'app.
    */
-  checkArg(ticker: string, tf: string, allTicker: any, allTf: any) {
+  checkArg(ticker: string, tf: number, allTicker: any, allTf: any) {
     if (!allTicker.includes(ticker) || !allTf.includes(tf)) {
       this.stopProcess("Argument error: " + ticker + " " + tf);
     }

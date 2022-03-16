@@ -1,7 +1,7 @@
 export class Config {
   appId = "6f80d617-3608-41de-808b-96d7ee2de49b";
-  xApiKey = "QTzYlhrRJgimiWjjXmWMww==";
-  xApiSecret = "Z3U3GMH2XY6DZCYSDC52AI5RHO2Q";
+  xApiKey = "jwj4P4LeeUcJ8gzTai0T9Q==";
+  xApiSecret = "R6AQ4FLNIATKNGBU2FNLQGZPDC7W";
   baseUrl = "https://api.woo.org";
   wsMarketDataUrl = "wss://wss.woo.org/ws/stream/";
   wsUserDataUrl = "wss://wss.woo.org/v2/ws/private/stream/";
