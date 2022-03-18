@@ -2,7 +2,7 @@ import { CandleAbstract } from "../abstract/candleAbstract";
 import { UtilsService } from "./utils-service";
 
 export class StrategiesService extends CandleAbstract {
-  lookback = 1;
+  lookback = 4;
 
   constructor(private utils: UtilsService) {
     super();
@@ -20,7 +20,7 @@ export class StrategiesService extends CandleAbstract {
     const bigHaOhlc = await this.utils.getBigTimeframeHA(ticker, tf, ftxApi);
 
     return {
-      startTrade: cond && bigHaOhlc[bigHaOhlc.length - 1].bull && haOhlc[i].bull /* && ratio >= 0 */,
+      startTrade: cond && /*  bigHaOhlc[bigHaOhlc.length - 1].bull && */ haOhlc[i].bull /* && ratio >= 0 */,
       stopLoss: haOhlc[i - 1].low,
     };
   }
