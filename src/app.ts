@@ -23,7 +23,6 @@ class App extends CandleAbstract {
   allTf = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]; //15, 60, 300, 900, 3600, 14400,
   ticker: string;
   tf: number;
-  ratio2p5: any;
   entryPrice: number;
   stoploss: number;
   ohlc = [];
@@ -33,7 +32,6 @@ class App extends CandleAbstract {
   streamData: any;
   telegramBot: any;
   databasePath: string;
-  emaValues: any;
   ftxApi: any;
   ftxWs: any;
   isHistoricalDataCalled: boolean = false;
@@ -116,8 +114,8 @@ class App extends CandleAbstract {
   }
 
   async getFtxStreamData() {
-    DefaultLogger.info = () => { };
-    DefaultLogger.debug = () => { };
+    DefaultLogger.info = () => {};
+    DefaultLogger.debug = () => {};
     this.ftxWs.subscribe({ channel: "trades", market: `${this.ticker}/USD` });
     this.ftxWs.on("open", () => {
       console.log("Socket is connected to FTX. Listenning data ...");
