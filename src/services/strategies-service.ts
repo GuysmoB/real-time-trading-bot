@@ -2,26 +2,34 @@ import { CandleAbstract } from "../abstract/candleAbstract";
 import { UtilsService } from "./utils-service";
 
 export class StrategiesService extends CandleAbstract {
-  lookback = 4;
-
   constructor(private utils: UtilsService) {
     super();
   }
 
-  async bullStrategy(haOhlc: any, i: number, ticker: string, tf: number, ftxApi: any, ratio: any) {
+  async bullStrategy(haOhlc: any, i: number, ticker: string, ratios: any) {
+    const lookback = 1;
     let cond = true;
-    for (let j = i - 1; j >= i - this.lookback; j--) {
+    for (let j = i - 1; j >= i - lookback; j--) {
       if (haOhlc[j]?.bull) {
         cond = false;
         break;
       }
     }
 
-    const bigHaOhlc = await this.utils.getBigTimeframeHA(ticker, tf, ftxApi);
+    const ratioLookback = 6;
+    let cond2 = false;
+    if (ratios.length >= ratioLookback) {
+      for (let j = ratios.length - 1; j > ratios.length - 1 - ratioLookback; j--) {
+        if ((ticker === "BULL" && ratios[j] >= 25) || (ticker === "BEAR" && ratios[j] <= -25)) {
+          cond2 = true;
+          break;
+        }
+      }
+    }
 
     return {
-      startTrade: cond && /*  bigHaOhlc[bigHaOhlc.length - 1].bull && */ haOhlc[i].bull /* && ratio >= 0 */,
-      stopLoss: haOhlc[i - 1].low,
+      startTrade: cond && haOhlc[i].bull && cond2,
+      stopLoss: this.utils.lowest(haOhlc, i, "low", 5), //haOhlc[i - 1].low
     };
   }
 }

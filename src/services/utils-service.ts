@@ -128,6 +128,23 @@ export class UtilsService {
     return result;
   }
 
+  mean(series: Array<number>): any {
+    let sum = 0;
+    for (let i = 0; i < series.length; i++) {
+      sum += series[i];
+    }
+    return sum / series.length;
+  }
+
+  ema(series: Array<number>, window: number, start?: number): any {
+    const weight = 2 / (window + 1);
+    const ema = [start ? start : this.mean(series.slice(0, window))];
+    for (let i = 1, len = series.length; i < len; i++) {
+      ema.push(series[i] * weight + (1 - weight) * ema[i - 1]);
+    }
+    return ema;
+  }
+
   /**
    * Retourne la date avec décalage horaire.
    */

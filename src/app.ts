@@ -27,11 +27,13 @@ class App extends CandleAbstract {
   entryPrice: number;
   stoploss: number;
   ohlc = [];
+  ratios = [];
   ohlc_tmp: any;
   haOhlc = [];
   streamData: any;
   telegramBot: any;
   databasePath: string;
+  emaValues: any;
   ftxApi: any;
   ftxWs: any;
   isHistoricalDataCalled: boolean = false;
@@ -85,6 +87,8 @@ class App extends CandleAbstract {
    */
   async main() {
     try {
+      this.ratios.push(await this.utils.getFirebaseResults("/orderbook-data-trade"));
+
       if (this.ohlc_tmp) {
         this.ohlc_tmp.close = this.streamData.price;
         this.ohlc.push(this.ohlc_tmp);
@@ -105,10 +109,8 @@ class App extends CandleAbstract {
         low: this.streamData.price,
       };
 
-      if (this.ohlc.length >= 5) {
-        this.haOhlc = this.utils.setHeikenAshiData(this.ohlc); //lookback condition avec OHLC length
-        this.bullOrBear();
-      }
+      this.haOhlc = this.utils.setHeikenAshiData(this.ohlc);
+      this.bullOrBear();
     } catch (e) {
       console.error("Main erreur: ", e);
     }
@@ -142,7 +144,7 @@ class App extends CandleAbstract {
   checkTradeResult() {
     let result: number;
 
-    if (this.streamData.price <= this.stoploss || this.haOhlc[this.haOhlc.length - 1].bear) {
+    if (this.streamData.price <= this.stoploss) {
       this.inLong = false;
       result = this.utils.getPercentageResult(this.entryPrice, this.streamData.price);
       if (this.streamData.price <= this.stoploss) console.log("Stoploss hit");
@@ -172,7 +174,7 @@ class App extends CandleAbstract {
     //console.log("candle cloturée", this.ohlc[i]);
 
     if (!this.inLong) {
-      const resLong = await this.stratService.bullStrategy(this.haOhlc, i, this.ticker, this.tf, this.ftxApi, this.ratio2p5);
+      const resLong = await this.stratService.bullStrategy(this.haOhlc, i, this.ticker, this.ratios);
       if (resLong.startTrade) {
         this.inLong = true;
         this.entryPrice = this.streamData.price;
@@ -180,6 +182,11 @@ class App extends CandleAbstract {
         console.log("Entry long setup", this.utils.getDate());
         console.log("EntryPrice", this.entryPrice);
         console.log("StopLoss", this.stoploss);
+      }
+    } else {
+      const lowest = this.utils.lowest(this.ohlc, i, "low", 5);
+      if (lowest > this.stoploss) {
+        this.stoploss = lowest;
       }
     }
   }
