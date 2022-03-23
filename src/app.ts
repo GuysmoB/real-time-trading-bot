@@ -48,7 +48,6 @@ class App extends CandleAbstract {
   ) {
     super();
     this.initApp();
-    //this.main();
 
     let lastTime: number;
     setInterval(async () => {
@@ -117,8 +116,8 @@ class App extends CandleAbstract {
   }
 
   async getFtxStreamData() {
-    DefaultLogger.info = () => {};
-    DefaultLogger.debug = () => {};
+    DefaultLogger.info = () => { };
+    DefaultLogger.debug = () => { };
     this.ftxWs.subscribe({ channel: "trades", market: `${this.ticker}/USD` });
     this.ftxWs.on("open", () => {
       console.log("Socket is connected to FTX. Listenning data ...");
@@ -179,7 +178,7 @@ class App extends CandleAbstract {
         this.inLong = true;
         this.entryPrice = this.streamData.price;
         this.stoploss = resLong.stopLoss;
-        console.log("Entry long setup", this.utils.getDate());
+        console.log(`Entry long setup ${this.ticker} ${this.tf} min`, this.utils.getDate());
         console.log("EntryPrice", this.entryPrice);
         console.log("StopLoss", this.stoploss);
       }
