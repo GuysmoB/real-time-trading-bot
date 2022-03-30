@@ -7,7 +7,7 @@ export class StrategiesService extends CandleAbstract {
   }
 
   async bullStrategy(haOhlc: any, i: number, ticker: string, ratios: any) {
-    const lookback = 1;
+    const lookback = 4;
     let cond = true;
     for (let j = i - 1; j >= i - lookback; j--) {
       if (haOhlc[j]?.bull) {
@@ -28,7 +28,7 @@ export class StrategiesService extends CandleAbstract {
     }
 
     return {
-      startTrade: cond && haOhlc[i].bull && cond2,
+      startTrade: cond && haOhlc[i].bull /*  && cond2 */,
       stopLoss: this.utils.lowest(haOhlc, i, "low", 5), //haOhlc[i - 1].low
     };
   }

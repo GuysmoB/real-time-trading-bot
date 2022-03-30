@@ -46,7 +46,8 @@ class App extends CandleAbstract {
   ) {
     super();
     this.initApp();
-
+    //
+    this.main();
     let lastTime: number;
     setInterval(async () => {
       const second = new Date().getSeconds();
@@ -95,6 +96,7 @@ class App extends CandleAbstract {
         const data = await this.ftxApi.getHistoricalPrices({ market_name: `${this.ticker}/USD`, resolution: `${this.tf * 60}` }); // Pour TEST
         this.ohlc = data.result;
         this.isHistoricalDataCalled = true;
+        //this.utils.transformToBiggerTimeframe(this.ohlc, 15);
       }
 
       const date = Date.now();
@@ -121,7 +123,10 @@ class App extends CandleAbstract {
       console.log("Socket is connected to FTX. Listenning data ...");
     });
     this.ftxWs.on("response", (msg) => console.log("response: ", msg));
-    this.ftxWs.on("error", (msg) => console.log("err: ", msg));
+    this.ftxWs.on("error", (msg) => {
+      console.log("error, reconnecting ...", msg);
+      this.getFtxStreamData();
+    });
     this.ftxWs.on("update", (msg) => {
       if (isWsTradesEvent(msg)) {
         this.streamData = msg.data[0];
@@ -177,13 +182,14 @@ class App extends CandleAbstract {
         this.entryPrice = this.streamData.price;
         this.stoploss = resLong.stopLoss;
         console.log(`Entry long setup ${this.ticker} ${this.tf} min`, this.utils.getDate());
-        console.log("EntryPrice", this.entryPrice);
-        console.log("StopLoss", this.stoploss);
+        console.log("Entry price", this.entryPrice);
+        console.log("Stoploss", this.stoploss);
       }
     } else {
       const lowest = this.utils.lowest(this.ohlc, i, "low", 5);
       if (lowest > this.stoploss) {
         this.stoploss = lowest;
+        console.log("Stoploss updated", this.stoploss);
       }
     }
   }

@@ -50,6 +50,38 @@ export class UtilsService {
     return array.reduce((a, b) => a + b, 0);
   }
 
+  transformToBiggerTimeframe(data: any, tf: any) {
+    let result = [];
+    let isModulo = false;
+    let index = 0;
+
+    for (let i = 0; i < data.length; i++) {
+      if (Math.trunc(data[i].time / 60000) % tf === 0) {
+        isModulo = true;
+        index = i;
+        break;
+      }
+    }
+
+    if (isModulo) {
+      for (let i = index; i < data.length; i += tf) {
+        const tmpArray = data.slice(i, i + tf);
+        const highArray = tmpArray.map((a) => a.high);
+        const lowArray = tmpArray.map((a) => a.low);
+
+        result.push({
+          open: tmpArray[0].open,
+          high: Math.max(...highArray),
+          low: Math.min(...lowArray),
+          close: tmpArray[tmpArray.length - 1].close,
+          time: tmpArray[0].time,
+          startTime: tmpArray[0].startTime,
+        });
+      }
+    }
+    return result;
+  }
+
   /**
    * Retourne la valeur maximale en fonction de la source et de lookback
    */
