@@ -165,7 +165,7 @@ export class UtilsService {
     for (let i = 0; i < series.length; i++) {
       sum += series[i];
     }
-    return sum / series.length;
+    return this.round(sum / series.length, 2);
   }
 
   ema(series: Array<number>, window: number, start?: number): any {

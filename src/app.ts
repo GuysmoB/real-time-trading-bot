@@ -27,6 +27,7 @@ class App extends CandleAbstract {
   stoploss: number;
   ohlc = [];
   ratios = [];
+  ecarts = [];
   ohlc_tmp: any;
   haOhlc = [];
   streamData: any;
@@ -46,8 +47,7 @@ class App extends CandleAbstract {
   ) {
     super();
     this.initApp();
-    //
-    this.main();
+    //    this.main();
     let lastTime: number;
     setInterval(async () => {
       const second = new Date().getSeconds();
